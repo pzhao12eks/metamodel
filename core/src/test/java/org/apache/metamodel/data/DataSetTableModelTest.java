@@ -23,7 +23,6 @@ import java.util.List;
 
 import javax.swing.table.TableModel;
 
-import com.google.common.collect.Lists;
 import org.apache.metamodel.MetaModelHelper;
 import org.apache.metamodel.query.SelectItem;
 import org.apache.metamodel.schema.MutableColumn;
@@ -35,13 +34,14 @@ public class DataSetTableModelTest extends TestCase {
     public void testToTableModel() throws Exception {
         SelectItem[] selectItems = MetaModelHelper.createSelectItems(new MutableColumn("CUSTOMERNUMBER"),
                 new MutableColumn("CUSTOMERNAME"), new MutableColumn("CONTACTLASTNAME"));
-        CachingDataSetHeader header = new CachingDataSetHeader(Lists.newArrayList(selectItems));
+        CachingDataSetHeader header = new CachingDataSetHeader(selectItems);
         List<Row> rows = new ArrayList<Row>();
         rows.add(new DefaultRow(header, new Object[] { 1, "John", "Doe" }));
         rows.add(new DefaultRow(header, new Object[] { 2, "John", "Taylor" }));
         DataSet data = new InMemoryDataSet(header, rows);
 
-        TableModel tableModel = new DataSetTableModel(data);
+        @SuppressWarnings("deprecation")
+        TableModel tableModel = data.toTableModel();
         data.close();
 
         assertEquals(3, tableModel.getColumnCount());

@@ -18,36 +18,28 @@
  */
 package org.apache.metamodel.schema;
 
-import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.io.ObjectInputStream.GetField;
 import java.io.Serializable;
-import java.util.Arrays;
-import java.util.List;
-import java.util.stream.Collectors;
-
-import org.apache.metamodel.util.LegacyDeserializationObjectInputStream;
 
 public final class ImmutableRelationship extends AbstractRelationship implements Serializable {
 
 	private static final long serialVersionUID = 1L;
 
-	private final List<Column> primaryColumns;
-	private final List<Column> foreignColumns;
+	private final Column[] primaryColumns;
+	private final Column[] foreignColumns;
 
 	public static void create(Relationship origRelationship,
 			ImmutableSchema schema) {
 		ImmutableTable primaryTable = getSimilarTable(
 				origRelationship.getPrimaryTable(), schema);
 		assert primaryTable != null;
-		List<Column> primaryColumns = getSimilarColumns(
+		Column[] primaryColumns = getSimilarColumns(
 				origRelationship.getPrimaryColumns(), primaryTable);
 		checkSameTable(primaryColumns);
 
 		ImmutableTable foreignTable = getSimilarTable(
 				origRelationship.getForeignTable(), schema);
 		assert foreignTable != null;
-		List<Column> foreignColumns = getSimilarColumns(
+		Column[] foreignColumns = getSimilarColumns(
 				origRelationship.getForeignColumns(), foreignTable);
 		checkSameTable(foreignColumns);
 
@@ -57,11 +49,13 @@ public final class ImmutableRelationship extends AbstractRelationship implements
 		foreignTable.addRelationship(relationship);
 	}
 
-	private static List<Column> getSimilarColumns(List<Column> columns, Table table) {
-		return columns.stream()
-				.map( col -> table.getColumnByName(col.getName()))
-				.collect(Collectors.toList());
-
+	private static Column[] getSimilarColumns(Column[] columns, Table table) {
+		Column[] result = new Column[columns.length];
+		for (int i = 0; i < columns.length; i++) {
+			String name = columns[i].getName();
+			result[i] = table.getColumnByName(name);
+		}
+		return result;
 	}
 
 	private static ImmutableTable getSimilarTable(Table table,
@@ -70,33 +64,19 @@ public final class ImmutableRelationship extends AbstractRelationship implements
 		return (ImmutableTable) schema.getTableByName(name);
 	}
 
-	private ImmutableRelationship(List<Column> primaryColumns,
-			List<Column> foreignColumns) {
+	private ImmutableRelationship(Column[] primaryColumns,
+			Column[] foreignColumns) {
 		this.primaryColumns = primaryColumns;
 		this.foreignColumns = foreignColumns;
 	}
 
 	@Override
-	public List<Column> getPrimaryColumns() {
+	public Column[] getPrimaryColumns() {
 		return primaryColumns;
 	}
 
 	@Override
-	public List<Column> getForeignColumns() {
+	public Column[] getForeignColumns() {
 		return foreignColumns;
 	}
-
-    private void readObject(ObjectInputStream stream) throws IOException, ClassNotFoundException {
-        final GetField getFields = stream.readFields();
-        Object primaryColumns = getFields.get("primaryColumns", null);
-        Object foreignColumns = getFields.get("foreignColumns", null);
-        if (primaryColumns instanceof Column[] && foreignColumns instanceof Column[]) {
-            primaryColumns = Arrays.<Column> asList((Column[]) primaryColumns);
-            foreignColumns = Arrays.<Column> asList((Column[]) foreignColumns);
-        }
-        LegacyDeserializationObjectInputStream.setField(ImmutableRelationship.class, this, "primaryColumns",
-                primaryColumns);
-        LegacyDeserializationObjectInputStream.setField(ImmutableRelationship.class, this, "foreignColumns",
-                foreignColumns);
-    }
 }

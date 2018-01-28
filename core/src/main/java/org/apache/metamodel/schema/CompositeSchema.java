@@ -20,11 +20,10 @@ package org.apache.metamodel.schema;
 
 import java.util.Collection;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 import org.apache.metamodel.DataContext;
+import org.apache.metamodel.util.CollectionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -61,18 +60,21 @@ public class CompositeSchema extends AbstractSchema {
     }
 
     @Override
-    public List<Relationship> getRelationships() {
-        return delegates.stream()
-                .flatMap(delegate -> delegate.getRelationships().stream())
-                .collect(Collectors.toList());
+    public Relationship[] getRelationships() {
+        Relationship[] result = new Relationship[0];
+        for (Schema delegate : delegates) {
+            result = CollectionUtils.array(result, delegate.getRelationships());
+        }
+        return result;
     }
 
     @Override
-    public List<Table> getTables() {
-        return delegates.stream()
-                .flatMap(delegate -> delegate.getTables().stream())
-                .filter(table -> table.getType() != TableType.ALIAS)
-                .collect(Collectors.toList());
+    public Table[] getTables() {
+        Table[] result = new Table[0];
+        for (Schema delegate : delegates) {
+            result = CollectionUtils.array(result, delegate.getTables());
+        }
+        return result;
     }
 
     @Override

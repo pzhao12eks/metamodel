@@ -18,15 +18,8 @@
  */
 package org.apache.metamodel.schema;
 
-import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.io.ObjectInputStream.GetField;
 import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
 
-import org.apache.metamodel.util.LegacyDeserializationObjectInputStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -43,8 +36,8 @@ public class MutableRelationship extends AbstractRelationship implements
 	private static final Logger logger = LoggerFactory
 			.getLogger(MutableRelationship.class);
 
-	private final List<Column> _primaryColumns;
-	private final List<Column> _foreignColumns;
+	private final Column[] _primaryColumns;
+	private final Column[] _foreignColumns;
 
 	/**
 	 * Factory method to create relations between two tables by specifying which
@@ -56,8 +49,8 @@ public class MutableRelationship extends AbstractRelationship implements
 	 *            the columns from the foreign key table
 	 * @return the relation created
 	 */
-	public static Relationship createRelationship(List<Column> primaryColumns,
-			List<Column> foreignColumns) {
+	public static Relationship createRelationship(Column[] primaryColumns,
+			Column[] foreignColumns) {
 		Table primaryTable = checkSameTable(primaryColumns);
 		Table foreignTable = checkSameTable(foreignColumns);
 		MutableRelationship relation = new MutableRelationship(primaryColumns,
@@ -112,44 +105,26 @@ public class MutableRelationship extends AbstractRelationship implements
 
 	public static Relationship createRelationship(Column primaryColumn,
 			Column foreignColumn) {
-		List<Column> pcols = new ArrayList<>();
-		pcols.add(primaryColumn);
-		List<Column> fcols = new ArrayList<>();
-		fcols.add(foreignColumn);
-
-
-		return createRelationship(pcols, fcols);
+		return createRelationship(new Column[] { primaryColumn },
+				new Column[] { foreignColumn });
 	}
 
 	/**
 	 * Prevent external instantiation
 	 */
-	private MutableRelationship(List<Column> primaryColumns, List<Column> foreignColumns) {
+	private MutableRelationship(Column[] primaryColumns, Column[] foreignColumns) {
 		_primaryColumns = primaryColumns;
 		_foreignColumns = foreignColumns;
 	}
 
 	@Override
-	public List<Column> getPrimaryColumns() {
+	public Column[] getPrimaryColumns() {
 		return _primaryColumns;
 	}
 
 	@Override
-	public List<Column> getForeignColumns() {
+	public Column[] getForeignColumns() {
 		return _foreignColumns;
 	}
 
-    private void readObject(ObjectInputStream stream) throws IOException, ClassNotFoundException {
-        final GetField getFields = stream.readFields();
-        Object primaryColumns = getFields.get("_primaryColumns", null);
-        Object foreignColumns = getFields.get("_foreignColumns", null);
-        if (primaryColumns instanceof Column[] && foreignColumns instanceof Column[]) {
-            primaryColumns = Arrays.<Column> asList((Column[]) primaryColumns);
-            foreignColumns = Arrays.<Column> asList((Column[]) foreignColumns);
-        }
-        LegacyDeserializationObjectInputStream.setField(MutableRelationship.class, this, "_primaryColumns",
-                primaryColumns);
-        LegacyDeserializationObjectInputStream.setField(MutableRelationship.class, this, "_foreignColumns",
-                foreignColumns);
-    }
 }

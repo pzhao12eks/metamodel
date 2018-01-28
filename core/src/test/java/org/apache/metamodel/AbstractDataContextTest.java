@@ -18,9 +18,10 @@
  */
 package org.apache.metamodel;
 
-import java.util.*;
+import java.util.Arrays;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
-import com.google.common.collect.Lists;
 import junit.framework.TestCase;
 import org.apache.metamodel.data.DataSet;
 import org.apache.metamodel.query.Query;
@@ -56,8 +57,8 @@ public class AbstractDataContextTest extends TestCase {
         }
 
         @Override
-        protected List<String> getSchemaNamesInternal() {
-            return new ArrayList<>(_schemas.keySet());
+        protected String[] getSchemaNamesInternal() {
+            return _schemas.keySet().toArray(new String[0]);
         }
 
         @Override
@@ -153,8 +154,8 @@ public class AbstractDataContextTest extends TestCase {
             }
 
             @Override
-            protected List<String> getSchemaNamesInternal() {
-                return Lists.newArrayList("test");
+            protected String[] getSchemaNamesInternal() {
+                return new String[] { "test" };
             }
 
             @Override
@@ -208,12 +209,12 @@ public class AbstractDataContextTest extends TestCase {
 
     public void testGetSchemas() throws Exception {
         MyDataContext dc = new MyDataContext();
-        List<Schema> schemas = dc.getSchemas();
-        assertEquals("[Schema[name=barfoo], Schema[name=foo.bar], Schema[name=foobar]]", Arrays.toString(schemas.toArray()));
+        Schema[] schemas = dc.getSchemas();
+        assertEquals("[Schema[name=barfoo], Schema[name=foo.bar], Schema[name=foobar]]", Arrays.toString(schemas));
 
         dc.refreshSchemas();
         schemas = dc.getSchemas();
-        assertEquals("[Schema[name=barfoo], Schema[name=foo.bar], Schema[name=foobar]]", Arrays.toString(schemas.toArray()));
+        assertEquals("[Schema[name=barfoo], Schema[name=foo.bar], Schema[name=foobar]]", Arrays.toString(schemas));
     }
 
     public void testGetColumnByQualifiedLabelWithNameOverlaps() throws Exception {
@@ -225,8 +226,8 @@ public class AbstractDataContextTest extends TestCase {
             }
 
             @Override
-            protected List<String> getSchemaNamesInternal() {
-                return Lists.newArrayList( "sch" );
+            protected String[] getSchemaNamesInternal() {
+                return new String[] { "sch" };
             }
 
             @Override

@@ -22,8 +22,6 @@ import org.apache.metamodel.query.FunctionType;
 import org.apache.metamodel.schema.Column;
 import org.apache.metamodel.schema.Table;
 
-import java.util.List;
-
 /**
  * Represents a builder where the FROM part is satisfied, ie. a SELECT clause is
  * now buildable.
@@ -49,9 +47,7 @@ public interface SatisfiedFromBuilder {
     public CountSelectBuilder<?> selectCount();
 
     public SatisfiedSelectBuilder<?> select(Column... columns);
-
-    public SatisfiedSelectBuilder<?> select(List<Column> columns);
-
+    
     public SatisfiedSelectBuilder<?> selectAll();
 
     public SatisfiedSelectBuilder<?> select(String selectExpression);

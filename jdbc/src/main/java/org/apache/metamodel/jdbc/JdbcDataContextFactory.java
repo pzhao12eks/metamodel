@@ -26,20 +26,22 @@ import javax.sql.DataSource;
 
 import org.apache.metamodel.ConnectionException;
 import org.apache.metamodel.DataContext;
-import org.apache.metamodel.factory.AbstractDataContextFactory;
+import org.apache.metamodel.factory.DataContextFactory;
 import org.apache.metamodel.factory.DataContextProperties;
 import org.apache.metamodel.factory.ResourceFactoryRegistry;
 import org.apache.metamodel.schema.TableType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class JdbcDataContextFactory extends AbstractDataContextFactory {
+public class JdbcDataContextFactory implements DataContextFactory {
 
     private static final Logger logger = LoggerFactory.getLogger(JdbcDataContextFactory.class);
 
+    public static final String PROPERTY_TYPE = "jdbc";
+
     @Override
-    protected String getType() {
-        return "jdbc";
+    public boolean accepts(DataContextProperties properties, ResourceFactoryRegistry resourceFactoryRegistry) {
+        return PROPERTY_TYPE.equals(properties.getDataContextType());
     }
 
     @Override
@@ -54,8 +56,8 @@ public class JdbcDataContextFactory extends AbstractDataContextFactory {
             }
         }
 
-        final TableType[] tableTypes =
-                properties.getTableTypes() == null ? TableType.DEFAULT_TABLE_TYPES : properties.getTableTypes();
+        final TableType[] tableTypes = properties.getTableTypes() == null ? TableType.DEFAULT_TABLE_TYPES
+                : properties.getTableTypes();
         final String catalogName = properties.getCatalogName();
 
         final DataSource dataSource = properties.getDataSource();

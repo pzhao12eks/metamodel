@@ -60,7 +60,7 @@ public class DB2QueryRewriter extends DefaultQueryRewriter {
     }
 
     @Override
-    public boolean isFirstRowSupported(final Query query) {
+    public boolean isFirstRowSupported() {
         return true;
     }
 

@@ -20,6 +20,11 @@ package org.apache.metamodel.dialects;
 
 import static org.apache.metamodel.jdbc.JdbcDataContext.DATABASE_PRODUCT_SQLSERVER;
 
+import java.sql.Connection;
+import java.sql.DatabaseMetaData;
+
+import junit.framework.TestCase;
+
 import org.apache.metamodel.jdbc.JdbcDataContext;
 import org.apache.metamodel.jdbc.dialects.SQLServerQueryRewriter;
 import org.apache.metamodel.query.FilterItem;
@@ -33,9 +38,6 @@ import org.apache.metamodel.schema.MutableSchema;
 import org.apache.metamodel.schema.MutableTable;
 import org.apache.metamodel.util.TimeComparator;
 import org.easymock.EasyMock;
-import org.junit.Assert;
-
-import junit.framework.TestCase;
 
 public class SQLServerQueryRewriterTest extends TestCase {
 
@@ -87,31 +89,6 @@ public class SQLServerQueryRewriterTest extends TestCase {
         assertEquals("SELECT TOP 20 MY_SCHEMA.\"foo\".\"bar\" FROM MY_SCHEMA.\"foo\"", qr.rewriteQuery(q));
     }
 
-    public void testOffsetFetchConstruct() {
-        final int offset = 1000;
-        final int rows = 100;
-
-        final String baseQuery = "SELECT MY_SCHEMA.\"foo\".\"bar\" FROM MY_SCHEMA.\"foo\" ORDER BY id ASC";
-        final String baseQueryWithTop =
-                "SELECT TOP " + rows + " MY_SCHEMA.\"foo\".\"bar\" FROM MY_SCHEMA.\"foo\" ORDER BY id ASC";
-        final String offsetClause = " OFFSET " + (offset - 1) + " ROWS";
-        final String fetchClause = " FETCH NEXT " + rows + " ROWS ONLY";
-
-        Query query = new Query();
-        query.from(table).select(column).orderBy("id");
-        Assert.assertEquals("There shouldn't be OFFSET-FETCH clause.", baseQuery, qr.rewriteQuery(query));
-
-        query.setFirstRow(offset);
-        Assert.assertEquals("Wrong or missing OFFSET clause.", baseQuery + offsetClause, qr.rewriteQuery(query));
-
-        query.setMaxRows(rows);
-        Assert.assertEquals("Wrong or missing OFFSET and FETCH clauses.", baseQuery + offsetClause + fetchClause,
-                qr.rewriteQuery(query));
-
-        query.setFirstRow(null);
-        Assert.assertEquals("Using FETCH clause instead of TOP clause.", baseQueryWithTop, qr.rewriteQuery(query));
-    }
-
     public void testRewriteFilterItem() {
 
         MutableColumn timestampColumn = new MutableColumn("timestamp");
@@ -122,10 +99,10 @@ public class SQLServerQueryRewriterTest extends TestCase {
                 .select(column)
                 .select(timestampColumn)
                 .where(new FilterItem(new SelectItem(timestampColumn), OperatorType.LESS_THAN, TimeComparator
-                        .toDate("2014-06-28 14:06:00.123")));
+                        .toDate("2014-06-28 14:06:00")));
 
         assertEquals(
-                "SELECT MY_SCHEMA.\"foo\".\"bar\", timestamp FROM MY_SCHEMA.\"foo\" WHERE timestamp < CAST('20140628 14:06:00.123' AS DATETIME)",
+                "SELECT MY_SCHEMA.\"foo\".\"bar\", timestamp FROM MY_SCHEMA.\"foo\" WHERE timestamp < CAST('20140628 14:06:00' AS DATETIME)",
                 qr.rewriteQuery(q));
     }
 

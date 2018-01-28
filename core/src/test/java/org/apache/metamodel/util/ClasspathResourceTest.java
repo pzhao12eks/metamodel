@@ -18,6 +18,8 @@
  */
 package org.apache.metamodel.util;
 
+import java.io.InputStream;
+
 import junit.framework.TestCase;
 
 public class ClasspathResourceTest extends TestCase {
@@ -27,14 +29,17 @@ public class ClasspathResourceTest extends TestCase {
         assertEquals("foo", resource.getName());
         assertTrue(resource.isExists());
         assertTrue(resource.isReadOnly());
-
+        
         resource = new ClasspathResource("/folder/foo");
         assertEquals("foo", resource.getName());
         assertTrue(resource.isExists());
         assertTrue(resource.isReadOnly());
-
-        String result = resource.read(inputStream -> {
-            return FileHelper.readInputStreamAsString(inputStream, "UTF8");
+        
+        String result = resource.read(new Func<InputStream, String>() {
+            @Override
+            public String eval(InputStream inputStream) {
+                return FileHelper.readInputStreamAsString(inputStream, "UTF8");
+            }
         });
         assertEquals("bar-baz", result);
     }

@@ -19,10 +19,9 @@
 package org.apache.metamodel.data;
 
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
-import java.util.stream.Collectors;
 
+import org.apache.metamodel.MetaModelHelper;
 import org.apache.metamodel.query.SelectItem;
 import org.apache.metamodel.schema.Column;
 
@@ -47,15 +46,13 @@ public class SimpleDataSetHeader implements DataSetHeader {
         this(Arrays.asList(selectItems));
     }
 
-
-    public static SimpleDataSetHeader fromColumns(List<Column> cols){
-        return new SimpleDataSetHeader(cols.stream().map(SelectItem::new).collect(Collectors.toList()));
+    public SimpleDataSetHeader(Column[] columns) {
+        this(MetaModelHelper.createSelectItems(columns));
     }
 
-
     @Override
-    public final List<SelectItem> getSelectItems() {
-        return Collections.unmodifiableList(_items);
+    public final SelectItem[] getSelectItems() {
+        return _items.toArray(new SelectItem[_items.size()]);
     }
 
     @Override
@@ -103,6 +100,12 @@ public class SimpleDataSetHeader implements DataSetHeader {
                 return i;
             }
             i++;
+        }
+        
+        final boolean scalarFunctionQueried = item.getScalarFunction() != null;
+        if (scalarFunctionQueried) {
+            final SelectItem itemWithoutFunction = item.replaceFunction(null);
+            return indexOf(itemWithoutFunction);
         }
 
         return -1;

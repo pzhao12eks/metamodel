@@ -19,12 +19,15 @@
 package org.apache.metamodel.schema;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.stream.Collectors;
+import java.util.Set;
 
+import org.apache.metamodel.util.Action;
+import org.apache.metamodel.util.CollectionUtils;
 import org.apache.metamodel.util.EqualsBuilder;
+import org.apache.metamodel.util.HasNameMapper;
+import org.apache.metamodel.util.Predicate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -48,15 +51,25 @@ public abstract class AbstractSchema implements Schema {
     }
 
     @Override
-    public Collection<Relationship> getRelationships() {
-        return getTables().stream()
-                .flatMap(tab -> tab.getRelationships().stream())
-                .collect(Collectors.toCollection(LinkedHashSet::new));
+    public Relationship[] getRelationships() {
+        final Set<Relationship> result = new LinkedHashSet<Relationship>();
+        CollectionUtils.forEach(getTables(), new Action<Table>() {
+            @Override
+            public void run(Table table) {
+                Relationship[] relations = table.getRelationships();
+                for (int i = 0; i < relations.length; i++) {
+                    Relationship relation = relations[i];
+                    result.add(relation);
+                }
+            }
+        });
+        return result.toArray(new Relationship[result.size()]);
     }
 
     @Override
     public Table getTable(int index) throws IndexOutOfBoundsException {
-        return getTables().get(index);
+        Table[] tables = getTables();
+        return tables[index];
     }
 
     @Override
@@ -66,24 +79,27 @@ public abstract class AbstractSchema implements Schema {
 
     @Override
     public final int getTableCount(TableType type) {
-        return getTables(type).size();
+        return getTables(type).length;
     }
 
     @Override
     public final int getRelationshipCount() {
-        return getRelationships().size();
+        return getRelationships().length;
     }
 
     @Override
     public final int getTableCount() {
-        return getTables().size();
+        return getTables().length;
     }
 
     @Override
-    public final List<Table> getTables(final TableType type) {
-        return  getTables().stream()
-                .filter(table -> table.getType().equals(type))
-                .collect(Collectors.toList());
+    public final Table[] getTables(final TableType type) {
+        return CollectionUtils.filter(getTables(), new Predicate<Table>() {
+            @Override
+            public Boolean eval(Table table) {
+                return table.getType() == type;
+            }
+        }).toArray(new Table[0]);
     }
 
     @Override
@@ -123,17 +139,16 @@ public abstract class AbstractSchema implements Schema {
     }
 
     @Override
-    public final List<String> getTableNames() {
-        return getTables().stream()
-                .map(table -> table.getName())
-                .collect(Collectors.toList());
+    public final String[] getTableNames() {
+        Table[] tables = getTables();
+        return CollectionUtils.map(tables, new HasNameMapper()).toArray(new String[tables.length]);
     }
 
     @Override
     public final String toString() {
         return "Schema[name=" + getName() + "]";
     }
-
+    
     @Override
     public boolean equals(Object obj) {
         if (obj == null) {
@@ -153,15 +168,14 @@ public abstract class AbstractSchema implements Schema {
                     int tableCount2 = other.getTableCount();
                     eb.append(tableCount1, tableCount2);
                 } catch (Exception e) {
-                    // might occur when schemas are disconnected. Omit this
-                    // check then.
+                    // might occur when schemas are disconnected. Omit this check then.
                 }
             }
             return eb.isEquals();
         }
         return false;
     }
-
+    
     @Override
     public int hashCode() {
         String name = getName();

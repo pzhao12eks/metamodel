@@ -69,7 +69,6 @@ public class HBaseDataContext extends QueryPostprocessDataContext {
      * @param configuration
      */
     public HBaseDataContext(HBaseConfiguration configuration) {
-        super(false);
         Configuration config = createConfig(configuration);
         _configuration = configuration;
         _connection = createConnection(config);
@@ -82,7 +81,6 @@ public class HBaseDataContext extends QueryPostprocessDataContext {
      * @param connection
      */
     public HBaseDataContext(HBaseConfiguration configuration, Connection connection) {
-        super(false);
         _configuration = configuration;
         _connection = connection;
     }
@@ -213,7 +211,7 @@ public class HBaseDataContext extends QueryPostprocessDataContext {
     }
 
     @Override
-    protected DataSet materializeMainSchemaTable(Table table, List<Column> columns, int maxRows) {
+    protected DataSet materializeMainSchemaTable(Table table, Column[] columns, int maxRows) {
         final Scan scan = new Scan();
         for (Column column : columns) {
             if (!column.isPrimaryKey()) {

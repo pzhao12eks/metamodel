@@ -19,14 +19,6 @@
 package org.apache.metamodel.csv;
 
 import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.io.ObjectInputStream.GetField;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
-import java.util.Optional;
 
 import org.apache.metamodel.schema.AbstractTable;
 import org.apache.metamodel.schema.Column;
@@ -39,9 +31,8 @@ import org.apache.metamodel.schema.naming.ColumnNamingContextImpl;
 import org.apache.metamodel.schema.naming.ColumnNamingSession;
 import org.apache.metamodel.schema.naming.ColumnNamingStrategy;
 import org.apache.metamodel.util.FileHelper;
-import org.apache.metamodel.util.LegacyDeserializationObjectInputStream;
 
-import com.opencsv.CSVReader;
+import au.com.bytecode.opencsv.CSVReader;
 
 final class CsvTable extends AbstractTable {
 
@@ -49,7 +40,7 @@ final class CsvTable extends AbstractTable {
 
     private final CsvSchema _schema;
     private final String _tableName;
-    private List<Column> _columns;
+    private Column[] _columns;
 
     /**
      * Constructor for creating a new CSV table which has not yet been written.
@@ -57,7 +48,7 @@ final class CsvTable extends AbstractTable {
      * @param schema
      * @param columnNames
      */
-    public CsvTable(CsvSchema schema, String tableName, List<String> columnNames) {
+    public CsvTable(CsvSchema schema, String tableName, String[] columnNames) {
         this(schema, tableName);
         _columns = buildColumns(columnNames);
     }
@@ -84,7 +75,7 @@ final class CsvTable extends AbstractTable {
     }
 
     @Override
-    public List<Column> getColumns() {
+    public Column[] getColumns() {
         if (_columns == null) {
             synchronized (this) {
                 if (_columns == null) {
@@ -95,7 +86,7 @@ final class CsvTable extends AbstractTable {
         return _columns;
     }
 
-    private List<Column> buildColumns() {
+    private Column[] buildColumns() {
         CSVReader reader = null;
         try {
             reader = _schema.getDataContext().createCsvReader(0);
@@ -104,7 +95,7 @@ final class CsvTable extends AbstractTable {
             for (int i = 1; i < columnNameLineNumber; i++) {
                 reader.readNext();
             }
-            final List<String> columnHeaders = Arrays.asList(Optional.ofNullable(reader.readNext()).orElse(new String[0]));
+            final String[] columnHeaders = reader.readNext();
 
             reader.close();
             return buildColumns(columnHeaders);
@@ -116,9 +107,9 @@ final class CsvTable extends AbstractTable {
         }
     }
 
-    private List<Column> buildColumns(final List<String> columnNames) {
+    private Column[] buildColumns(final String[] columnNames) {
         if (columnNames == null) {
-            return new ArrayList<>();
+            return new Column[0];
         }
         
         final CsvConfiguration configuration = _schema.getDataContext().getConfiguration();
@@ -126,17 +117,16 @@ final class CsvTable extends AbstractTable {
         final boolean nullable = !configuration.isFailOnInconsistentRowLength();
         final ColumnNamingStrategy columnNamingStrategy = configuration.getColumnNamingStrategy();
 
-        List<Column> columns = new ArrayList<>();
-
+        final Column[] columns = new Column[columnNames.length];
         try (final ColumnNamingSession namingSession = columnNamingStrategy.startColumnNamingSession()) {
-            for (int i = 0; i < columnNames.size(); i++) {
+            for (int i = 0; i < columnNames.length; i++) {
                 final String intrinsicColumnName = columnNameLineNumber == CsvConfiguration.NO_COLUMN_NAME_LINE ? null
-                        : columnNames.get(i);
+                        : columnNames[i];
                 final String columnName = namingSession.getNextColumnName(new ColumnNamingContextImpl(this,
                         intrinsicColumnName, i));
                 final Column column = new MutableColumn(columnName, ColumnType.STRING, this, i, null, null, nullable,
                         null, false, null);
-                columns.add(column);
+                columns[i] = column;
             }
         }
         return columns;
@@ -153,8 +143,8 @@ final class CsvTable extends AbstractTable {
     }
 
     @Override
-    public Collection<Relationship> getRelationships() {
-        return Collections.emptyList();
+    public Relationship[] getRelationships() {
+        return new Relationship[0];
     }
 
     @Override
@@ -165,18 +155,5 @@ final class CsvTable extends AbstractTable {
     @Override
     public String getQuote() {
         return null;
-    }
-
-    private void readObject(ObjectInputStream stream) throws IOException, ClassNotFoundException {
-        final GetField getFields = stream.readFields();
-        Object columns = getFields.get("_columns", null);
-        if (columns instanceof Column[]) {
-            columns = Arrays.<Column> asList((Column[]) columns);
-        }
-        final Object schema = getFields.get("_schema", null);
-        final Object tableName = getFields.get("_tableName", null);
-        LegacyDeserializationObjectInputStream.setField(CsvTable.class, this, "_columns", columns);
-        LegacyDeserializationObjectInputStream.setField(CsvTable.class, this, "_schema", schema);
-        LegacyDeserializationObjectInputStream.setField(CsvTable.class, this, "_tableName", tableName);
     }
 }

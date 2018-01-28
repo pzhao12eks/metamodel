@@ -24,7 +24,6 @@ import java.util.Arrays;
 
 import org.apache.metamodel.insert.AbstractRowInsertionBuilder;
 import org.apache.metamodel.insert.RowInsertionBuilder;
-import org.apache.metamodel.jdbc.JdbcUtils.JdbcActionType;
 import org.apache.metamodel.jdbc.dialects.IQueryRewriter;
 import org.apache.metamodel.query.FromItem;
 import org.apache.metamodel.schema.Column;
@@ -67,7 +66,7 @@ final class JdbcInsertBuilder extends AbstractRowInsertionBuilder<JdbcUpdateCall
 		}
 		final JdbcUpdateCallback updateCallback = getUpdateCallback();
 		final boolean reuseStatement = !_inlineValues;
-		final PreparedStatement st = updateCallback.getPreparedStatement(sql, reuseStatement, true);
+		final PreparedStatement st = updateCallback.getPreparedStatement(sql, reuseStatement);
 		try {
 			if (reuseStatement) {
 				Column[] columns = getColumns();
@@ -82,9 +81,9 @@ final class JdbcInsertBuilder extends AbstractRowInsertionBuilder<JdbcUpdateCall
 					}
 				}
 			}
-			updateCallback.executeInsert(st, reuseStatement);
+			updateCallback.executePreparedStatement(st, reuseStatement);
 		} catch (SQLException e) {
-			throw JdbcUtils.wrapException(e, "execute insert statement: " + sql, JdbcActionType.UPDATE);
+			throw JdbcUtils.wrapException(e, "execute insert statement: " + sql);
 		} finally {
 			if (_inlineValues) {
 				FileHelper.safeClose(st);

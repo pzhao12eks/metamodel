@@ -33,7 +33,6 @@ import java.util.List;
 import org.apache.metamodel.MetaModelException;
 import org.apache.metamodel.QueryPostprocessDataContext;
 import org.apache.metamodel.UpdateScript;
-import org.apache.metamodel.UpdateSummary;
 import org.apache.metamodel.UpdateableDataContext;
 import org.apache.metamodel.data.DataSet;
 import org.apache.metamodel.data.EmptyDataSet;
@@ -42,16 +41,15 @@ import org.apache.metamodel.schema.Column;
 import org.apache.metamodel.schema.Table;
 import org.apache.metamodel.util.FileHelper;
 import org.apache.metamodel.util.FileResource;
+import org.apache.metamodel.util.Func;
 import org.apache.metamodel.util.Resource;
 import org.apache.metamodel.util.ResourceUtils;
 import org.apache.metamodel.util.UrlResource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.opencsv.CSVParserBuilder;
-import com.opencsv.CSVReader;
-import com.opencsv.ICSVParser;
-import com.opencsv.RFC4180ParserBuilder;
+import au.com.bytecode.opencsv.CSVParser;
+import au.com.bytecode.opencsv.CSVReader;
 
 /**
  * DataContext implementation for reading CSV files.
@@ -69,9 +67,9 @@ public final class CsvDataContext extends QueryPostprocessDataContext implements
     /**
      * Constructs a CSV DataContext based on a file
      *
-     * The file provided can be either existing or non-existing. In the case of
-     * non-existing files, a file will be automatically created when a CREATE
-     * TABLE update is executed on the DataContext.
+     * The file provided can be either existing or non-existing. In the
+     * case of non-existing files, a file will be automatically created
+     * when a CREATE TABLE update is executed on the DataContext.
      * 
      * @param file
      * @param configuration
@@ -135,12 +133,90 @@ public final class CsvDataContext extends QueryPostprocessDataContext implements
     }
 
     /**
+     * @deprecated use {@link #CsvDataContext(File, CsvConfiguration)} instead.
+     */
+    @Deprecated
+    public CsvDataContext(File file, char separatorChar) {
+        this(file, separatorChar, CsvConfiguration.DEFAULT_QUOTE_CHAR);
+    }
+
+    /**
+     * @deprecated use {@link #CsvDataContext(File, CsvConfiguration)} instead.
+     */
+    @Deprecated
+    public CsvDataContext(File file, char separatorChar, char quoteChar) {
+        this(file, new CsvConfiguration(CsvConfiguration.DEFAULT_COLUMN_NAME_LINE, FileHelper.DEFAULT_ENCODING,
+                separatorChar, quoteChar, CsvConfiguration.DEFAULT_ESCAPE_CHAR));
+    }
+
+    /**
+     * @deprecated use {@link #CsvDataContext(File, CsvConfiguration)} instead.
+     */
+    @Deprecated
+    public CsvDataContext(File file, char separatorChar, char quoteChar, String encoding) {
+        this(file, new CsvConfiguration(CsvConfiguration.DEFAULT_COLUMN_NAME_LINE, encoding, separatorChar, quoteChar,
+                CsvConfiguration.DEFAULT_ESCAPE_CHAR));
+    }
+
+    /**
+     * @deprecated use {@link #CsvDataContext(URL, CsvConfiguration)} instead.
+     */
+    @Deprecated
+    public CsvDataContext(URL url, char separatorChar, char quoteChar) {
+        this(url, separatorChar, quoteChar, FileHelper.DEFAULT_ENCODING);
+    }
+
+    /**
+     * @deprecated use {@link #CsvDataContext(URL, CsvConfiguration)} instead.
+     */
+    @Deprecated
+    public CsvDataContext(URL url, char separatorChar, char quoteChar, String encoding) {
+        this(url, new CsvConfiguration(CsvConfiguration.DEFAULT_COLUMN_NAME_LINE, encoding, separatorChar, quoteChar,
+                CsvConfiguration.DEFAULT_ESCAPE_CHAR));
+    }
+
+    /**
+     * @deprecated use {@link #CsvDataContext(InputStream, CsvConfiguration)}
+     *             instead.
+     */
+    @Deprecated
+    public CsvDataContext(InputStream inputStream, char separatorChar, char quoteChar) {
+        this(inputStream, new CsvConfiguration(CsvConfiguration.DEFAULT_COLUMN_NAME_LINE, FileHelper.DEFAULT_ENCODING,
+                separatorChar, quoteChar, CsvConfiguration.DEFAULT_ESCAPE_CHAR));
+    }
+
+    /**
+     * @deprecated use {@link #CsvDataContext(InputStream, CsvConfiguration)}
+     *             instead.
+     */
+    @Deprecated
+    public CsvDataContext(InputStream inputStream, char separatorChar, char quoteChar, String encoding) {
+        this(inputStream, new CsvConfiguration(CsvConfiguration.DEFAULT_COLUMN_NAME_LINE, encoding, separatorChar,
+                quoteChar, CsvConfiguration.DEFAULT_ESCAPE_CHAR));
+    }
+
+    /**
      * Gets the CSV configuration used
      * 
      * @return a CSV configuration
      */
     public CsvConfiguration getConfiguration() {
         return _configuration;
+    }
+
+    /**
+     * Gets the CSV file being read
+     * 
+     * @return a file
+     * 
+     * @deprecated use {@link #getResource()} instead.
+     */
+    @Deprecated
+    public File getFile() {
+        if (_resource instanceof FileResource) {
+            return ((FileResource) _resource).getFile();
+        }
+        return null;
     }
 
     /**
@@ -198,59 +274,62 @@ public final class CsvDataContext extends QueryPostprocessDataContext implements
         if (!functionApproximationAllowed) {
             return null;
         }
-
+        
         if (whereItems != null && !whereItems.isEmpty()) {
             return null;
         }
-
+        
         final long length = _resource.getSize();
         if (length < 0) {
             // METAMODEL-30: Sometimes the size of the resource is not known
             return null;
         }
 
-        return _resource.read(inputStream -> {
-            try {
-                // read up to 5 megs of the file and approximate number of
-                // lines based on that.
+        return _resource.read(new Func<InputStream, Number>() {
+            @Override
+            public Number eval(InputStream inputStream) {
+                try {
+                    // read up to 5 megs of the file and approximate number of
+                    // lines based on that.
 
-                final int sampleSize = (int) Math.min(length, 1024 * 1024 * 5);
-                final int chunkSize = Math.min(sampleSize, 1024 * 1024);
+                    final int sampleSize = (int) Math.min(length, 1024 * 1024 * 5);
+                    final int chunkSize = Math.min(sampleSize, 1024 * 1024);
 
-                int readSize = 0;
-                int newlines = 0;
-                int carriageReturns = 0;
-                byte[] byteBuffer = new byte[chunkSize];
-                char[] charBuffer = new char[chunkSize];
+                    int readSize = 0;
+                    int newlines = 0;
+                    int carriageReturns = 0;
+                    byte[] byteBuffer = new byte[chunkSize];
+                    char[] charBuffer = new char[chunkSize];
 
-                while (readSize < sampleSize) {
-                    final int read = inputStream.read(byteBuffer);
-                    if (read == -1) {
-                        break;
-                    } else {
-                        readSize += read;
-                    }
+                    while (readSize < sampleSize) {
+                        final int read = inputStream.read(byteBuffer);
+                        if (read == -1) {
+                            break;
+                        } else {
+                            readSize += read;
+                        }
 
-                    Reader reader = getReader(byteBuffer, _configuration.getEncoding());
-                    reader.read(charBuffer);
-                    for (char c : charBuffer) {
-                        if ('\n' == c) {
-                            newlines++;
-                        } else if ('\r' == c) {
-                            carriageReturns++;
+                        Reader reader = getReader(byteBuffer, _configuration.getEncoding());
+                        reader.read(charBuffer);
+                        for (char c : charBuffer) {
+                            if ('\n' == c) {
+                                newlines++;
+                            } else if ('\r' == c) {
+                                carriageReturns++;
+                            }
                         }
                     }
+
+                    int lines = Math.max(newlines, carriageReturns);
+
+                    logger.info("Found {} lines breaks in {} bytes", lines, sampleSize);
+
+                    long approxCount = (long) (lines * length / sampleSize);
+                    return approxCount;
+                } catch (IOException e) {
+                    logger.error("Unexpected error during COUNT(*) approximation", e);
+                    throw new IllegalStateException(e);
                 }
-
-                int lines = Math.max(newlines, carriageReturns);
-
-                logger.info("Found {} lines breaks in {} bytes", lines, sampleSize);
-
-                long approxCount = (long) (lines * length / sampleSize);
-                return approxCount;
-            } catch (IOException e) {
-                logger.error("Unexpected error during COUNT(*) approximation", e);
-                throw new IllegalStateException(e);
             }
         });
     }
@@ -270,7 +349,7 @@ public final class CsvDataContext extends QueryPostprocessDataContext implements
     }
 
     @Override
-    public DataSet materializeMainSchemaTable(Table table, List<Column> columns, int maxRows) {
+    public DataSet materializeMainSchemaTable(Table table, Column[] columns, int maxRows) {
         final int lineNumber = _configuration.getColumnNameLineNumber();
         final int columnCount = table.getColumnCount();
 
@@ -282,7 +361,7 @@ public final class CsvDataContext extends QueryPostprocessDataContext implements
                 String line = reader.readLine();
                 if (line == null) {
                     FileHelper.safeClose(reader);
-                    return EmptyDataSet.fromColumns(columns);
+                    return new EmptyDataSet(columns);
                 }
             }
         } catch (IOException e) {
@@ -299,30 +378,23 @@ public final class CsvDataContext extends QueryPostprocessDataContext implements
             return new CsvDataSet(csvReader, columns, maxRowsOrNull, columnCount, failOnInconsistentRowLength);
         }
 
-        return new SingleLineCsvDataSet(reader, createParser(), columns, maxRowsOrNull, columnCount,
+        final CSVParser csvParser = new CSVParser(_configuration.getSeparatorChar(), _configuration.getQuoteChar(),
+                _configuration.getEscapeChar());
+        return new SingleLineCsvDataSet(reader, csvParser, columns, maxRowsOrNull, columnCount,
                 failOnInconsistentRowLength);
-    }
-
-    private ICSVParser createParser() {
-        final ICSVParser parser;
-        if (_configuration.getEscapeChar() == _configuration.getQuoteChar()) {
-            parser = new RFC4180ParserBuilder().withSeparator(_configuration.getSeparatorChar())
-                    .withQuoteChar(_configuration.getQuoteChar()).build();
-        } else {
-            parser = new CSVParserBuilder().withSeparator(_configuration.getSeparatorChar())
-                    .withQuoteChar(_configuration.getQuoteChar()).withEscapeChar(_configuration.getEscapeChar())
-                    .build();
-        }
-        return parser;
     }
 
     protected CSVReader createCsvReader(int skipLines) {
         final Reader reader = FileHelper.getReader(_resource.read(), _configuration.getEncoding());
-        return new CSVReader(reader, skipLines, createParser());
+        final CSVReader csvReader = new CSVReader(reader, _configuration.getSeparatorChar(),
+                _configuration.getQuoteChar(), _configuration.getEscapeChar(), skipLines);
+        return csvReader;
     }
 
     protected CSVReader createCsvReader(BufferedReader reader) {
-        return new CSVReader(reader, CSVReader.DEFAULT_SKIP_LINES, createParser());
+        final CSVReader csvReader = new CSVReader(reader, _configuration.getSeparatorChar(),
+                _configuration.getQuoteChar(), _configuration.getEscapeChar());
+        return csvReader;
     }
 
     @Override
@@ -351,10 +423,9 @@ public final class CsvDataContext extends QueryPostprocessDataContext implements
     }
 
     @Override
-    public UpdateSummary executeUpdate(UpdateScript update) {
+    public void executeUpdate(UpdateScript update) {
         checkWritable();
-        
-        final CsvUpdateCallback callback = new CsvUpdateCallback(this);
+        CsvUpdateCallback callback = new CsvUpdateCallback(this);
         synchronized (WRITE_LOCK) {
             try {
                 update.run(callback);
@@ -362,6 +433,5 @@ public final class CsvDataContext extends QueryPostprocessDataContext implements
                 callback.close();
             }
         }
-        return callback.getUpdateSummary();
     }
 }

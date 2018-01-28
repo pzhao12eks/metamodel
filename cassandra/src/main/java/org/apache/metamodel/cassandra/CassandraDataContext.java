@@ -69,6 +69,7 @@ import com.datastax.driver.core.querybuilder.Select.Selection;
 public class CassandraDataContext extends QueryPostprocessDataContext implements DataContext {
 
     private static final Logger logger = LoggerFactory.getLogger(CassandraDataContext.class);
+
     private final Cluster cassandraCluster;
     private final SimpleTableDef[] tableDefs;
     private final String keySpaceName;
@@ -87,7 +88,6 @@ public class CassandraDataContext extends QueryPostprocessDataContext implements
      *            and column model of the ElasticSearch index.
      */
     public CassandraDataContext(Cluster cluster, String keySpace, SimpleTableDef... tableDefs) {
-        super(false);
         this.cassandraCluster = cluster;
         this.keySpaceName = keySpace;
         this.tableDefs = tableDefs;
@@ -188,7 +188,7 @@ public class CassandraDataContext extends QueryPostprocessDataContext implements
     }
 
     @Override
-    protected DataSet materializeMainSchemaTable(Table table, List<Column> columns, int maxRows) {
+    protected DataSet materializeMainSchemaTable(Table table, Column[] columns, int maxRows) {
         final Select query = QueryBuilder.select().all().from(keySpaceName, table.getName());
         if (limitMaxRowsIsSet(maxRows)) {
             query.limit(maxRows);

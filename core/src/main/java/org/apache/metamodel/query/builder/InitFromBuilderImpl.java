@@ -65,7 +65,7 @@ public final class InitFromBuilderImpl extends BaseObject implements InitFromBui
         Table table = schema.getTableByName(tableName);
         if (table == null) {
             throw new IllegalArgumentException("Nu such table '" + tableName + "' found in schema: " + schema
-                    + ". Available tables are: " + Arrays.toString(schema.getTableNames().toArray()));
+                    + ". Available tables are: " + Arrays.toString(schema.getTableNames()));
         }
         return from(table);
     }

@@ -20,7 +20,6 @@ package org.apache.metamodel.util;
 
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.util.function.Function;
 
 /**
  * Abstract implementation of many methods in {@link Resource}
@@ -39,25 +38,12 @@ public abstract class AbstractResource implements Resource {
             FileHelper.safeClose(in);
         }
     }
-    
-    @Override
-    public <E> E read(Function<InputStream, E> readCallback) throws ResourceException {
-        final InputStream in = read();
-        try {
-            final E result = readCallback.apply(in);
-            return result;
-        } catch (Exception e) {
-            throw new ResourceException(this, "Error occurred in read callback", e);
-        } finally {
-            FileHelper.safeClose(in);
-        }
-    }
 
     @Override
-    public final <E> E read(UncheckedFunc<InputStream, E> readCallback) {
+    public final <E> E read(Func<InputStream, E> readCallback) {
         final InputStream in = read();
         try {
-            final E result = readCallback.applyUnchecked(in);
+            final E result = readCallback.eval(in);
             return result;
         } catch (Exception e) {
             throw new ResourceException(this, "Error occurred in read callback", e);

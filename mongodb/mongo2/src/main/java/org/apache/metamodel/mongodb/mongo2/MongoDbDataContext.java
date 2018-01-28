@@ -26,13 +26,11 @@ import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
 import org.apache.metamodel.DataContext;
 import org.apache.metamodel.MetaModelException;
 import org.apache.metamodel.QueryPostprocessDataContext;
 import org.apache.metamodel.UpdateScript;
-import org.apache.metamodel.UpdateSummary;
 import org.apache.metamodel.UpdateableDataContext;
 import org.apache.metamodel.data.DataSet;
 import org.apache.metamodel.data.DataSetHeader;
@@ -40,6 +38,7 @@ import org.apache.metamodel.data.InMemoryDataSet;
 import org.apache.metamodel.data.Row;
 import org.apache.metamodel.data.SimpleDataSetHeader;
 import org.apache.metamodel.mongodb.common.MongoDBUtils;
+import org.apache.metamodel.mongodb.common.MongoDbTableDef;
 import org.apache.metamodel.query.FilterItem;
 import org.apache.metamodel.query.FromItem;
 import org.apache.metamodel.query.OperatorType;
@@ -84,6 +83,17 @@ public class MongoDbDataContext extends QueryPostprocessDataContext implements U
     private Schema _schema;
 
     /**
+     * Constructor available for backwards compatibility
+     *
+     * @deprecated use {@link #MongoDbDataContext(DB, SimpleTableDef...)}
+     *             instead
+     */
+    @Deprecated
+    public MongoDbDataContext(DB mongoDb, MongoDbTableDef... tableDefs) {
+        this(mongoDb, (SimpleTableDef[]) tableDefs);
+    }
+
+    /**
      * Constructs a {@link MongoDbDataContext}. This constructor accepts a
      * custom array of {@link MongoDbTableDef}s which allows the user to define
      * his own view on the collections in the database.
@@ -97,7 +107,6 @@ public class MongoDbDataContext extends QueryPostprocessDataContext implements U
      *            ).
      */
     public MongoDbDataContext(DB mongoDb, SimpleTableDef... tableDefs) {
-        super(false);
         _mongoDb = mongoDb;
         _tableDefs = tableDefs;
         _schema = null;
@@ -202,7 +211,8 @@ public class MongoDbDataContext extends QueryPostprocessDataContext implements U
             for (SimpleTableDef tableDef : _tableDefs) {
 
                 MutableTable table = tableDef.toTable().setSchema(schema);
-                for (Column column : table.getColumnsOfType(ColumnType.ROWID)) {
+                Column[] rowIdColumns = table.getColumnsOfType(ColumnType.ROWID);
+                for (Column column : rowIdColumns) {
                     if (column instanceof MutableColumn) {
                         ((MutableColumn) column).setPrimaryKey(true);
                     }
@@ -277,7 +287,9 @@ public class MongoDbDataContext extends QueryPostprocessDataContext implements U
                 // "SELECT [columns] FROM [table] WHERE [conditions]"
                 // query.
                 for (SelectItem selectItem : selectItems) {
-                    if (selectItem.hasFunction() || selectItem.getColumn() == null) {
+                    if (selectItem.getAggregateFunction() != null
+                            || selectItem.getScalarFunction() != null
+                                    || selectItem.getColumn() == null) {
                         allSelectItemsAreColumns = false;
                         break;
                     }
@@ -287,7 +299,10 @@ public class MongoDbDataContext extends QueryPostprocessDataContext implements U
                     logger.debug("Query can be expressed in full MongoDB, no post processing needed.");
 
                     // prepare for a non-post-processed query
-
+                    Column[] columns = new Column[selectItems.size()];
+                    for (int i = 0; i < columns.length; i++) {
+                        columns[i] = selectItems.get(i).getColumn();
+                    }
 
                     // checking if the query is a primary key lookup query
                     if (whereItems.size() == 1) {
@@ -322,15 +337,16 @@ public class MongoDbDataContext extends QueryPostprocessDataContext implements U
                     }
 
                     if (thereIsAtLeastOneAlias) {
+                        final SelectItem[] selectItemsAsArray = selectItems.toArray(new SelectItem[selectItems.size()]);
                         final DataSet dataSet = materializeMainSchemaTableInternal(
                                 table,
-                                selectItems,
+                                selectItemsAsArray,
                                 whereItems,
                                 firstRow,
                                 maxRows, false);
                         return dataSet;
                     } else {
-                        final DataSet dataSet = materializeMainSchemaTableInternal(table, selectItems, whereItems, firstRow,
+                        final DataSet dataSet = materializeMainSchemaTableInternal(table, columns, whereItems, firstRow,
                                 maxRows, false);
                         return dataSet;
                     }
@@ -342,9 +358,14 @@ public class MongoDbDataContext extends QueryPostprocessDataContext implements U
         return super.executeQuery(query);
     }
 
+    private DataSet materializeMainSchemaTableInternal(Table table, Column[] columns, List<FilterItem> whereItems,
+            int firstRow, int maxRows, boolean queryPostProcessed) {
+        DBCursor cursor = getCursor(table, whereItems, firstRow, maxRows);
 
+        return new MongoDbDataSet(cursor, columns, queryPostProcessed);
+    }
 
-    private DataSet materializeMainSchemaTableInternal(Table table, List<SelectItem> selectItems,
+    private DataSet materializeMainSchemaTableInternal(Table table, SelectItem[] selectItems,
             List<FilterItem> whereItems, int firstRow, int maxRows, boolean queryPostProcessed) {
         DBCursor cursor = getCursor(table, whereItems, firstRow, maxRows);
 
@@ -470,50 +491,37 @@ public class MongoDbDataContext extends QueryPostprocessDataContext implements U
     }
 
     @Override
-    protected DataSet materializeMainSchemaTable(Table table, List<Column> columns, int maxRows) {
-        return materializeMainSchemaTableInternal(
-                table,
-                columns.stream().map(SelectItem::new).collect(Collectors.toList()),
-                null,
-                1,
-                maxRows,
-                true);
+    protected DataSet materializeMainSchemaTable(Table table, Column[] columns, int maxRows) {
+        return materializeMainSchemaTableInternal(table, columns, null, 1, maxRows, true);
     }
 
     @Override
-    protected DataSet materializeMainSchemaTable(Table table, List<Column> columns, int firstRow, int maxRows) {
-        return materializeMainSchemaTableInternal(
-                table,
-                columns.stream().map(SelectItem::new).collect(Collectors.toList()),
-                null,
-                firstRow,
-                maxRows,
-                true);
+    protected DataSet materializeMainSchemaTable(Table table, Column[] columns, int firstRow, int maxRows) {
+        return materializeMainSchemaTableInternal(table, columns, null, firstRow, maxRows, true);
     }
 
     /**
      * Executes an update with a specific {@link WriteConcernAdvisor}.
      */
-    public UpdateSummary executeUpdate(UpdateScript update, WriteConcernAdvisor writeConcernAdvisor) {
+    public void executeUpdate(UpdateScript update, WriteConcernAdvisor writeConcernAdvisor) {
         MongoDbUpdateCallback callback = new MongoDbUpdateCallback(this, writeConcernAdvisor);
         try {
             update.run(callback);
         } finally {
             callback.close();
         }
-        return callback.getUpdateSummary();
     }
 
     /**
      * Executes an update with a specific {@link WriteConcern}.
      */
-    public UpdateSummary executeUpdate(UpdateScript update, WriteConcern writeConcern) {
-        return executeUpdate(update, new SimpleWriteConcernAdvisor(writeConcern));
+    public void executeUpdate(UpdateScript update, WriteConcern writeConcern) {
+        executeUpdate(update, new SimpleWriteConcernAdvisor(writeConcern));
     }
 
     @Override
-    public UpdateSummary executeUpdate(UpdateScript update) {
-        return executeUpdate(update, getWriteConcernAdvisor());
+    public void executeUpdate(UpdateScript update) {
+        executeUpdate(update, getWriteConcernAdvisor());
     }
 
     /**

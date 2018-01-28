@@ -19,13 +19,10 @@
 package org.apache.metamodel.excel;
 
 import java.util.Iterator;
-import java.util.List;
-import java.util.stream.Collectors;
 
 import org.apache.metamodel.data.DataSet;
 import org.apache.metamodel.data.EmptyDataSet;
 import org.apache.metamodel.data.MaxRowsDataSet;
-import org.apache.metamodel.query.SelectItem;
 import org.apache.metamodel.schema.Column;
 import org.apache.metamodel.schema.ColumnType;
 import org.apache.metamodel.schema.MutableColumn;
@@ -33,7 +30,6 @@ import org.apache.metamodel.schema.MutableSchema;
 import org.apache.metamodel.schema.MutableTable;
 import org.apache.metamodel.schema.Schema;
 import org.apache.metamodel.schema.Table;
-import org.apache.metamodel.schema.TableType;
 import org.apache.metamodel.schema.naming.ColumnNamingContext;
 import org.apache.metamodel.schema.naming.ColumnNamingContextImpl;
 import org.apache.metamodel.schema.naming.ColumnNamingSession;
@@ -82,12 +78,12 @@ final class DefaultSpreadsheetReaderDelegate implements SpreadsheetReaderDelegat
     }
 
     @Override
-    public DataSet executeQuery(Table table, List<Column> columns, int maxRows) {
+    public DataSet executeQuery(Table table, Column[] columns, int maxRows) {
         final Workbook wb = ExcelUtils.readWorkbook(_resource);
         final Sheet sheet = wb.getSheet(table.getName());
 
         if (sheet == null || sheet.getPhysicalNumberOfRows() == 0) {
-            return new EmptyDataSet(columns.stream().map(SelectItem::new).collect(Collectors.toList()));
+            return new EmptyDataSet(columns);
         }
 
         DataSet dataSet = ExcelUtils.getDataSet(wb, sheet, table, _configuration);
@@ -104,7 +100,7 @@ final class DefaultSpreadsheetReaderDelegate implements SpreadsheetReaderDelegat
     }
 
     private MutableTable createTable(final Workbook wb, final Sheet sheet) {
-        final MutableTable table = new MutableTable(sheet.getSheetName(), TableType.TABLE);
+        final MutableTable table = new MutableTable(sheet.getSheetName());
 
         if (sheet.getPhysicalNumberOfRows() <= 0) {
             // no physical rows in sheet

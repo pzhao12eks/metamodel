@@ -21,10 +21,8 @@ package org.apache.metamodel.jdbc;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.util.List;
 
 import org.apache.metamodel.create.AbstractTableCreationBuilder;
-import org.apache.metamodel.jdbc.JdbcUtils.JdbcActionType;
 import org.apache.metamodel.jdbc.dialects.IQueryRewriter;
 import org.apache.metamodel.schema.Column;
 import org.apache.metamodel.schema.ColumnType;
@@ -61,7 +59,7 @@ final class JdbcCreateTableBuilder extends AbstractTableCreationBuilder<JdbcUpda
             final int rowsAffected = st.executeUpdate(sql);
             logger.debug("Create table statement executed, {} rows affected", rowsAffected);
         } catch (SQLException e) {
-            throw JdbcUtils.wrapException(e, "execute create table statement: " + sql, JdbcActionType.UPDATE);
+            throw JdbcUtils.wrapException(e, "execute create table statement: " + sql);
         } finally {
             FileHelper.safeClose(st);
         }
@@ -76,7 +74,7 @@ final class JdbcCreateTableBuilder extends AbstractTableCreationBuilder<JdbcUpda
     }
 
     private String createSqlStatement(Table table) {
-        final IQueryRewriter queryRewriter = getUpdateCallback().getJdbcDataContext().getQueryRewriter();
+        final IQueryRewriter queryRewriter = getUpdateCallback().getDataContext().getQueryRewriter();
         final StringBuilder sb = new StringBuilder();
         sb.append("CREATE TABLE ");
         final Schema schema = getSchema();
@@ -86,9 +84,9 @@ final class JdbcCreateTableBuilder extends AbstractTableCreationBuilder<JdbcUpda
         }
         sb.append(getUpdateCallback().quoteIfNescesary(table.getName()));
         sb.append(" (");
-        final List<Column> columns = table.getColumns();
-        for (int i = 0; i < columns.size(); i++) {
-            final Column column = columns.get(i);
+        final Column[] columns = table.getColumns();
+        for (int i = 0; i < columns.length; i++) {
+            final Column column = columns[i];
             if (i != 0) {
                 sb.append(", ");
             }
@@ -116,15 +114,15 @@ final class JdbcCreateTableBuilder extends AbstractTableCreationBuilder<JdbcUpda
             }
         }
         boolean primaryKeyExists = false;
-        for (int i = 0; i < columns.size(); i++) {
-            if (columns.get(i).isPrimaryKey()) {
+        for (int i = 0; i < columns.length; i++) {
+            if (columns[i].isPrimaryKey()) {
                 if (!primaryKeyExists) {
                     sb.append(", PRIMARY KEY(");
-                    sb.append(columns.get(i).getName());
+                    sb.append(columns[i].getName());
                     primaryKeyExists = true;
                 } else {
                     sb.append(",");
-                    sb.append(columns.get(i).getName());
+                    sb.append(columns[i].getName());
                 }
             }
         }

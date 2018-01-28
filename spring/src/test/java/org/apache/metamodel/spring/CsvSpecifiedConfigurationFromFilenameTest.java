@@ -51,7 +51,7 @@ public class CsvSpecifiedConfigurationFromFilenameTest {
 
         assertEquals("example.csv", resource.getName());
 
-        assertEquals("[\"foo\", bar]", Arrays.toString(csv.getDefaultSchema().getTable(0).getColumnNames().toArray()));
+        assertEquals("[\"foo\", bar]", Arrays.toString(csv.getDefaultSchema().getTable(0).getColumnNames()));
 
         Assert.assertFalse(csv.getConfiguration().isMultilineValues());
     }

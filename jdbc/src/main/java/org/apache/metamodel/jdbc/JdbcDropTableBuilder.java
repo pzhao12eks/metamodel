@@ -24,7 +24,6 @@ import java.sql.SQLException;
 
 import org.apache.metamodel.drop.AbstractTableDropBuilder;
 import org.apache.metamodel.drop.TableDropBuilder;
-import org.apache.metamodel.jdbc.JdbcUtils.JdbcActionType;
 import org.apache.metamodel.jdbc.dialects.IQueryRewriter;
 import org.apache.metamodel.query.FromItem;
 import org.apache.metamodel.schema.Schema;
@@ -47,9 +46,9 @@ final class JdbcDropTableBuilder extends AbstractTableDropBuilder implements Tab
     @Override
     public void execute() {
         final String sql = createSqlStatement();
-        final PreparedStatement statement = _updateCallback.getPreparedStatement(sql, false, false);
+        final PreparedStatement statement = _updateCallback.getPreparedStatement(sql, false);
         try {
-            _updateCallback.executePreparedStatement(statement, false, false);
+            _updateCallback.executePreparedStatement(statement, false);
 
             // remove the table reference from the schema
             final Schema schema = getTable().getSchema();
@@ -58,7 +57,7 @@ final class JdbcDropTableBuilder extends AbstractTableDropBuilder implements Tab
                 ((JdbcSchema) schema).refreshTables(connection);
             }
         } catch (SQLException e) {
-            throw JdbcUtils.wrapException(e, "execute drop table statement: " + sql, JdbcActionType.UPDATE);
+            throw JdbcUtils.wrapException(e, "execute drop table statement: " + sql);
         }
     }
 

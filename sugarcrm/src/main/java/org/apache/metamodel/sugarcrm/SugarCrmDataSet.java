@@ -22,7 +22,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.stream.Collectors;
 
 import org.apache.metamodel.data.AbstractDataSet;
 import org.apache.metamodel.data.DataSetHeader;
@@ -55,9 +54,9 @@ final class SugarCrmDataSet extends AbstractDataSet {
     private List<Object> _records;
     private Node _record;
 
-    public SugarCrmDataSet(List<Column> columns, SugarsoapPortType service, String session,
+    public SugarCrmDataSet(Column[] columns, SugarsoapPortType service, String session,
             GetEntryListResultVersion2 entryList) {
-        super(columns.stream().map(SelectItem::new).collect(Collectors.toList()));
+        super(columns);
         _recordIndex = new AtomicInteger();
         _service = service;
         _session = session;
@@ -81,9 +80,12 @@ final class SugarCrmDataSet extends AbstractDataSet {
             }
 
             final DataSetHeader header = getHeader();
-            final List<SelectItem> selectItems = header.getSelectItems();
-            final List<Column> columns = selectItems.stream().map(si -> si.getColumn()).collect(Collectors.toList());
-            final String moduleName = selectItems.get(0).getColumn().getTable().getName();
+            final SelectItem[] selectItems = header.getSelectItems();
+            final Column[] columns = new Column[selectItems.length];
+            for (int i = 0; i < columns.length; i++) {
+                columns[i] = selectItems[i].getColumn();
+            }
+            final String moduleName = selectItems[0].getColumn().getTable().getName();
             final SelectFields selectFields = SugarCrmXmlHelper.createSelectFields(columns);
 
             _entryList = _service.getEntryList(_session, moduleName, "", "", nextOffset, selectFields,

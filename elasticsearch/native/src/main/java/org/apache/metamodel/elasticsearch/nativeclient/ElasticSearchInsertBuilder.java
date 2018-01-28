@@ -26,7 +26,6 @@ import org.apache.metamodel.elasticsearch.common.ElasticSearchUtils;
 import org.apache.metamodel.insert.AbstractRowInsertionBuilder;
 import org.apache.metamodel.schema.Column;
 import org.apache.metamodel.schema.Table;
-import org.elasticsearch.action.index.IndexAction;
 import org.elasticsearch.action.index.IndexRequestBuilder;
 import org.elasticsearch.action.index.IndexResponse;
 import org.elasticsearch.client.Client;
@@ -47,8 +46,7 @@ final class ElasticSearchInsertBuilder extends AbstractRowInsertionBuilder<Elast
         final Client client = dataContext.getElasticSearchClient();
         final String indexName = dataContext.getIndexName();
         final String documentType = getTable().getName();
-        final IndexRequestBuilder requestBuilder =
-                new IndexRequestBuilder(client, IndexAction.INSTANCE).setIndex(indexName).setType(documentType);
+        final IndexRequestBuilder requestBuilder = new IndexRequestBuilder(client, indexName).setType(documentType);
 
         final Map<String, Object> valueMap = new HashMap<>();
         final Column[] columns = getColumns();
@@ -70,11 +68,11 @@ final class ElasticSearchInsertBuilder extends AbstractRowInsertionBuilder<Elast
         assert !valueMap.isEmpty();
 
         requestBuilder.setSource(valueMap);
+        requestBuilder.setCreate(true);
 
         final IndexResponse result = requestBuilder.execute().actionGet();
         
         logger.debug("Inserted document: id={}", result.getId());
-
-        client.admin().indices().prepareRefresh(indexName).execute().actionGet();
     }
+
 }

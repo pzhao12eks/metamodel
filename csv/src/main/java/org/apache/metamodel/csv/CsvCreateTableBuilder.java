@@ -23,8 +23,6 @@ import org.apache.metamodel.schema.MutableTable;
 import org.apache.metamodel.schema.Schema;
 import org.apache.metamodel.schema.Table;
 
-import java.util.List;
-
 final class CsvCreateTableBuilder extends AbstractTableCreationBuilder<CsvUpdateCallback> {
 
     public CsvCreateTableBuilder(CsvUpdateCallback updateCallback, Schema schema, String name) {
@@ -39,12 +37,12 @@ final class CsvCreateTableBuilder extends AbstractTableCreationBuilder<CsvUpdate
         CsvUpdateCallback csvUpdateCallback = getUpdateCallback();
 
         MutableTable table = getTable();
-        List<String> columnNames = table.getColumnNames();
+        String[] columnNames = table.getColumnNames();
 
         CsvDataContext csvDataContext = (CsvDataContext) csvUpdateCallback.getDataContext();
 
         if (csvDataContext.getConfiguration().getColumnNameLineNumber() != CsvConfiguration.NO_COLUMN_NAME_LINE) {
-            csvUpdateCallback.writeRow(columnNames.toArray(new String[columnNames.size()]), false);
+            csvUpdateCallback.writeRow(columnNames, false);
         }
 
         CsvSchema schema = (CsvSchema) table.getSchema();

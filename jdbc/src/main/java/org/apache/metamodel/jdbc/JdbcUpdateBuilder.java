@@ -23,7 +23,6 @@ import java.sql.SQLException;
 import java.util.List;
 
 import org.apache.metamodel.MetaModelException;
-import org.apache.metamodel.jdbc.JdbcUtils.JdbcActionType;
 import org.apache.metamodel.jdbc.dialects.IQueryRewriter;
 import org.apache.metamodel.query.FilterItem;
 import org.apache.metamodel.query.FromItem;
@@ -63,7 +62,7 @@ final class JdbcUpdateBuilder extends AbstractRowUpdationBuilder {
         String sql = createSqlStatement();
         logger.debug("Update statement created: {}", sql);
         final boolean reuseStatement = !_inlineValues;
-        final PreparedStatement st = _updateCallback.getPreparedStatement(sql, reuseStatement, false);
+        final PreparedStatement st = _updateCallback.getPreparedStatement(sql, reuseStatement);
         try {
             if (reuseStatement) {
                 Column[] columns = getColumns();
@@ -91,9 +90,9 @@ final class JdbcUpdateBuilder extends AbstractRowUpdationBuilder {
                     }
                 }
             }
-            _updateCallback.executeUpdate(st, reuseStatement);
+            _updateCallback.executePreparedStatement(st, reuseStatement);
         } catch (SQLException e) {
-            throw JdbcUtils.wrapException(e, "execute update statement: " + sql, JdbcActionType.UPDATE);
+            throw JdbcUtils.wrapException(e, "execute update statement: " + sql);
         } finally {
             if (_inlineValues) {
                 FileHelper.safeClose(st);

@@ -19,6 +19,7 @@
 package org.apache.metamodel;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
@@ -34,18 +35,17 @@ import org.apache.metamodel.query.parser.QueryParser;
 import org.apache.metamodel.schema.Column;
 import org.apache.metamodel.schema.Schema;
 import org.apache.metamodel.schema.Table;
-import org.apache.metamodel.schema.TableType;
 
 /**
- * Abstract implementation of the DataContext interface. Provides convenient implementations of all trivial and
- * datastore-independent methods.
+ * Abstract implementation of the DataContext interface. Provides convenient
+ * implementations of all trivial and datastore-independent methods.
  */
 public abstract class AbstractDataContext implements DataContext {
 
     private static final String NULL_SCHEMA_NAME_TOKEN = "<metamodel.schema.name.null>";
     private final ConcurrentMap<String, Schema> _schemaCache = new ConcurrentHashMap<String, Schema>();
     private final Comparator<? super String> _schemaNameComparator = SchemaNameComparator.getInstance();
-    private List<String> _schemaNameCache;
+    private String[] _schemaNameCache;
 
     /**
      * {@inheritDoc}
@@ -59,8 +59,9 @@ public abstract class AbstractDataContext implements DataContext {
     }
 
     /**
-     * Method invoked when schemas have been refreshed using {@link #refreshSchemas()}. Can be overridden to add
-     * callback functionality in subclasses.
+     * Method invoked when schemas have been refreshed using
+     * {@link #refreshSchemas()}. Can be overridden to add callback
+     * functionality in subclasses.
      */
     protected void onSchemaCacheRefreshed() {
     }
@@ -69,10 +70,11 @@ public abstract class AbstractDataContext implements DataContext {
      * {@inheritDoc}
      */
     @Override
-    public final List<Schema> getSchemas() throws MetaModelException {
-        List<String> schemaNames = getSchemaNames();
-        List<Schema> schemas = new ArrayList<>();
-        for (final String name : schemaNames) {
+    public final Schema[] getSchemas() throws MetaModelException {
+        String[] schemaNames = getSchemaNames();
+        Schema[] schemas = new Schema[schemaNames.length];
+        for (int i = 0; i < schemaNames.length; i++) {
+            final String name = schemaNames[i];
             final Schema schema = _schemaCache.get(getSchemaCacheKey(name));
             if (schema == null) {
                 final Schema newSchema = getSchemaByName(name);
@@ -81,12 +83,12 @@ public abstract class AbstractDataContext implements DataContext {
                 }
                 final Schema existingSchema = _schemaCache.putIfAbsent(getSchemaCacheKey(name), newSchema);
                 if (existingSchema == null) {
-                    schemas.add(newSchema);
+                    schemas[i] = newSchema;
                 } else {
-                    schemas.add(existingSchema);
+                    schemas[i] = existingSchema;
                 }
             } else {
-                schemas.add(schema);
+                schemas[i] = schema;
             }
         }
         return schemas;
@@ -103,12 +105,12 @@ public abstract class AbstractDataContext implements DataContext {
      * m {@inheritDoc}
      */
     @Override
-    public final List<String> getSchemaNames() throws MetaModelException {
+    public final String[] getSchemaNames() throws MetaModelException {
         if (_schemaNameCache == null) {
             _schemaNameCache = getSchemaNamesInternal();
         }
-        List<String> schemaNames = new ArrayList<>(_schemaNameCache);
-        schemaNames.sort(_schemaNameComparator);
+        String[] schemaNames = Arrays.copyOf(_schemaNameCache, _schemaNameCache.length);
+        Arrays.sort(schemaNames, _schemaNameComparator);
         return schemaNames;
     }
 
@@ -123,12 +125,13 @@ public abstract class AbstractDataContext implements DataContext {
             result = getSchemaByName(defaultSchemaName);
         }
         if (result == null) {
-            final List<Schema> schemas = getSchemas();
-            if (schemas.size() == 1) {
-                result = schemas.get(0);
+            final Schema[] schemas = getSchemas();
+            if (schemas.length == 1) {
+                result = schemas[0];
             } else {
                 int highestTableCount = -1;
-                for (Schema schema : schemas) {
+                for (int i = 0; i < schemas.length; i++) {
+                    final Schema schema = schemas[i];
                     String name = schema.getName();
                     if (schema != null) {
                         name = name.toLowerCase();
@@ -197,7 +200,7 @@ public abstract class AbstractDataContext implements DataContext {
             if (name == null) {
                 schema = getSchemaByNameInternal(null);
             } else {
-                List<String> schemaNames = getSchemaNames();
+                String[] schemaNames = getSchemaNames();
                 for (String schemaName : schemaNames) {
                     if (name.equalsIgnoreCase(schemaName)) {
                         schema = getSchemaByNameInternal(name);
@@ -252,7 +255,7 @@ public abstract class AbstractDataContext implements DataContext {
         }
 
         Schema schema = null;
-        final List<String> schemaNames = getSchemaNames();
+        final String[] schemaNames = getSchemaNames();
         for (final String schemaName : schemaNames) {
             if (schemaName == null) {
                 // search without schema name (some databases have only a single
@@ -299,10 +302,13 @@ public abstract class AbstractDataContext implements DataContext {
     /**
      * Searches for a particular column within a schema
      * 
-     * @param schemaNameSearch the schema name to use for search
-     * @param columnNameOriginal the original column name
-     * @param columnNameSearch the column name as it should be searched for (either the same as original, or lower case
-     *            in case of case-insensitive search)
+     * @param schemaNameSearch
+     *            the schema name to use for search
+     * @param columnNameOriginal
+     *            the original column name
+     * @param columnNameSearch
+     *            the column name as it should be searched for (either the same
+     *            as original, or lower case in case of case-insensitive search)
      * @return
      */
     private Column searchColumn(String schemaNameSearch, String columnNameOriginal, String columnNameSearch) {
@@ -327,7 +333,7 @@ public abstract class AbstractDataContext implements DataContext {
     private final Column getColumn(final Schema schema, final String tableAndColumnPath) {
         Table table = null;
         String columnPath = tableAndColumnPath;
-        final List<String> tableNames = schema.getTableNames();
+        final String[] tableNames = schema.getTableNames();
         for (final String tableName : tableNames) {
             if (tableName != null) {
                 // search case-sensitive
@@ -362,8 +368,8 @@ public abstract class AbstractDataContext implements DataContext {
             }
         }
 
-        if (table == null && schema.getTables().stream().filter(t -> t.getType() != TableType.ALIAS).count() == 1) {
-            table = schema.getTables().get(0);
+        if (table == null && tableNames.length == 1) {
+            table = schema.getTables()[0];
         }
 
         if (table != null) {
@@ -397,7 +403,7 @@ public abstract class AbstractDataContext implements DataContext {
         }
 
         Schema schema = null;
-        List<String> schemaNames = getSchemaNames();
+        String[] schemaNames = getSchemaNames();
         for (String schemaName : schemaNames) {
             if (schemaName == null) {
                 // there's an unnamed schema present.
@@ -446,7 +452,7 @@ public abstract class AbstractDataContext implements DataContext {
     /**
      * Tokenizes a path for a table or a column.
      * 
-     * @param path
+     * @param tableName
      * @param expectedParts
      * @return
      */
@@ -533,12 +539,13 @@ public abstract class AbstractDataContext implements DataContext {
     }
 
     /**
-     * Gets schema names from the non-abstract implementation. These schema names will be cached except if the
-     * {@link #refreshSchemas()} method is called.
+     * Gets schema names from the non-abstract implementation. These schema
+     * names will be cached except if the {@link #refreshSchemas()} method is
+     * called.
      * 
      * @return an array of schema names.
      */
-    protected abstract List<String> getSchemaNamesInternal();
+    protected abstract String[] getSchemaNamesInternal();
 
     /**
      * Gets the name of the default schema.
@@ -548,11 +555,14 @@ public abstract class AbstractDataContext implements DataContext {
     protected abstract String getDefaultSchemaName();
 
     /**
-     * Gets a specific schema from the non-abstract implementation. This schema object will be cached except if the
-     * {@link #refreshSchemas()} method is called.
+     * Gets a specific schema from the non-abstract implementation. This schema
+     * object will be cached except if the {@link #refreshSchemas()} method is
+     * called.
      * 
-     * @param name the name of the schema to get
-     * @return a schema object representing the named schema, or null if no such schema exists.
+     * @param name
+     *            the name of the schema to get
+     * @return a schema object representing the named schema, or null if no such
+     *         schema exists.
      */
     protected abstract Schema getSchemaByNameInternal(String name);
 }

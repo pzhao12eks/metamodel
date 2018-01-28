@@ -25,7 +25,6 @@ import java.util.List;
 import org.apache.commons.pool.impl.GenericObjectPool;
 import org.apache.commons.pool.impl.GenericObjectPool.Config;
 import org.apache.metamodel.MetaModelException;
-import org.apache.metamodel.jdbc.JdbcUtils.JdbcActionType;
 import org.apache.metamodel.query.CompiledQuery;
 import org.apache.metamodel.query.DefaultCompiledQuery;
 import org.apache.metamodel.query.Query;
@@ -105,7 +104,7 @@ final class JdbcCompiledQuery extends DefaultCompiledQuery implements CompiledQu
         }
 
         if (e instanceof SQLException) {
-            return JdbcUtils.wrapException((SQLException) e, message, JdbcActionType.OTHER);
+            return JdbcUtils.wrapException((SQLException) e, message);
         } else if (e instanceof RuntimeException) {
             return (RuntimeException) e;
         } else {

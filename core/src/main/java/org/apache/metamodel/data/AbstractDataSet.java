@@ -22,9 +22,12 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Objects;
 
+import javax.swing.table.TableModel;
+
+import org.apache.metamodel.MetaModelHelper;
 import org.apache.metamodel.query.SelectItem;
+import org.apache.metamodel.schema.Column;
 import org.apache.metamodel.util.BaseObject;
 
 /**
@@ -34,6 +37,15 @@ import org.apache.metamodel.util.BaseObject;
 public abstract class AbstractDataSet extends BaseObject implements DataSet {
 
     private final DataSetHeader _header;
+
+    /**
+     * @deprecated use one of the other constructors, to provide header
+     *             information.
+     */
+    @Deprecated
+    public AbstractDataSet() {
+        _header = null;
+    }
 
     public AbstractDataSet(SelectItem[] selectItems) {
         this(Arrays.asList(selectItems));
@@ -54,20 +66,23 @@ public abstract class AbstractDataSet extends BaseObject implements DataSet {
         if (dataSet instanceof AbstractDataSet) {
             _header = ((AbstractDataSet) dataSet).getHeader();
         } else {
-            _header = new CachingDataSetHeader(dataSet.getSelectItems());
+            _header = new CachingDataSetHeader(Arrays.asList(dataSet.getSelectItems()));
         }
     }
 
     public AbstractDataSet(DataSetHeader header) {
-        _header = Objects.requireNonNull(header);
+        _header = header;
     }
 
+    public AbstractDataSet(Column[] columns) {
+        this(MetaModelHelper.createSelectItems(columns));
+    }
 
     /**
      * {@inheritDoc}
      */
     @Override
-    public List<SelectItem> getSelectItems() {
+    public SelectItem[] getSelectItems() {
         return getHeader().getSelectItems();
     }
 
@@ -95,6 +110,15 @@ public abstract class AbstractDataSet extends BaseObject implements DataSet {
      * {@inheritDoc}
      */
     @Override
+    public final TableModel toTableModel() {
+        TableModel tableModel = new DataSetTableModel(this);
+        return tableModel;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
     public final List<Object[]> toObjectArrays() {
         try {
             List<Object[]> objects = new ArrayList<Object[]>();
@@ -113,7 +137,7 @@ public abstract class AbstractDataSet extends BaseObject implements DataSet {
      */
     @Override
     public String toString() {
-        return "DataSet[selectItems=" + Arrays.toString(getSelectItems().toArray()) + "]";
+        return "DataSet[selectItems=" + Arrays.toString(getSelectItems()) + "]";
     }
 
     @Override

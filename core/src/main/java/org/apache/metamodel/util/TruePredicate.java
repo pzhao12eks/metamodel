@@ -25,12 +25,12 @@ import java.io.Serializable;
  * 
  * @param <E>
  */
-public final class TruePredicate<E> implements java.util.function.Predicate<E>, Serializable {
+public final class TruePredicate<E> implements Predicate<E>, Serializable {
 
     private static final long serialVersionUID = 1L;
 
     @Override
-    public boolean test(E arg) {
+    public Boolean eval(E arg) {
         return true;
     }
     

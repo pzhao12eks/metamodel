@@ -22,10 +22,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 import org.apache.metamodel.convert.ConvertedDataSetInterceptor;
 import org.apache.metamodel.convert.Converters;
@@ -51,7 +49,6 @@ import org.apache.metamodel.query.SelectClause;
 import org.apache.metamodel.query.SelectItem;
 import org.apache.metamodel.schema.Column;
 import org.apache.metamodel.schema.ColumnType;
-import org.apache.metamodel.schema.DefaultTableAliasedSchema;
 import org.apache.metamodel.schema.MutableColumn;
 import org.apache.metamodel.schema.MutableRelationship;
 import org.apache.metamodel.schema.MutableSchema;
@@ -65,37 +62,24 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Abstract DataContext for data sources that do not support SQL queries natively.
+ * Abstract DataContext for data sources that do not support SQL queries
+ * natively.
  * 
- * Instead this superclass only requires that a subclass can materialize a single table at a time. Then the query will
- * be executed by post processing the datasets client-side.
+ * Instead this superclass only requires that a subclass can materialize a
+ * single table at a time. Then the query will be executed by post processing
+ * the datasets client-side.
  */
 public abstract class QueryPostprocessDataContext extends AbstractDataContext implements HasReadTypeConverters {
 
     private static final Logger logger = LoggerFactory.getLogger(QueryPostprocessDataContext.class);
 
-    public static final String SYSTEM_PROPERTY_CREATE_DEFAULT_TABLE_ALIAS = "metamodel.alias.default.table";
     public static final String INFORMATION_SCHEMA_NAME = "information_schema";
 
-    private final Map<Column, TypeConverter<?, ?>> converters;
-    private final boolean singleTableDatastore;
+    private final Map<Column, TypeConverter<?, ?>> _converters;
 
     public QueryPostprocessDataContext() {
-        this(true);
-    }
-
-    /**
-     * 
-     * @param singleTableDatastore a flag that, if set to true, indicates that this DataContext contains just a single
-     *            table. This information will be used to optimize and provide convenience for the implementation. An
-     *            additional {@link Table} of type {@link TableType#ALIAS} with the name "default_table" will be
-     *            automatically added in addition to the single table. That again makes for convenient querying of the
-     *            single table using a predictable name/alias.
-     */
-    public QueryPostprocessDataContext(boolean singleTableDatastore) {
         super();
-        this.singleTableDatastore = singleTableDatastore;
-        this.converters = new HashMap<Column, TypeConverter<?, ?>>();
+        _converters = new HashMap<Column, TypeConverter<?, ?>>();
     }
 
     @Override
@@ -127,7 +111,7 @@ public abstract class QueryPostprocessDataContext extends AbstractDataContext im
         if (singleFromItem && noGrouping) {
 
             final FromItem fromItem = query.getFromClause().getItem(0);
-            final Table table = MetaModelHelper.resolveTable(fromItem);
+            final Table table = fromItem.getTable();
             if (table != null) {
 
                 // check for SELECT COUNT(*) queries
@@ -143,7 +127,7 @@ public abstract class QueryPostprocessDataContext extends AbstractDataContext im
                                 logger.debug(
                                         "DataContext did not return any count query results. Proceeding with manual counting.");
                             } else {
-                                final List<Row> data = new ArrayList<Row>(1);
+                                List<Row> data = new ArrayList<Row>(1);
                                 final DataSetHeader header = new SimpleDataSetHeader(new SelectItem[] { selectItem });
                                 data.add(new DefaultRow(header, new Object[] { count }));
                                 return new InMemoryDataSet(header, data);
@@ -158,8 +142,7 @@ public abstract class QueryPostprocessDataContext extends AbstractDataContext im
                     if (whereItems.size() == 1) {
                         final FilterItem whereItem = whereItems.get(0);
                         final SelectItem selectItem = whereItem.getSelectItem();
-                        if (!whereItem.isCompoundFilter() && selectItem != null && !selectItem.hasFunction()
-                                && selectItem.getColumn() != null) {
+                        if (!whereItem.isCompoundFilter() && selectItem != null && selectItem.getColumn() != null) {
                             final Column column = selectItem.getColumn();
                             if (column.isPrimaryKey() && OperatorType.EQUALS_TO.equals(whereItem.getOperator())) {
                                 logger.debug(
@@ -167,8 +150,8 @@ public abstract class QueryPostprocessDataContext extends AbstractDataContext im
                                 if (table != null) {
                                     if (isMainSchemaTable(table)) {
                                         final Object operand = whereItem.getOperand();
-                                        final Row row =
-                                                executePrimaryKeyLookupQuery(table, selectItems, column, operand);
+                                        final Row row = executePrimaryKeyLookupQuery(table, selectItems, column,
+                                                operand);
                                         if (row == null) {
                                             logger.debug(
                                                     "DataContext did not return any GET query results. Proceeding with manual lookup.");
@@ -184,6 +167,12 @@ public abstract class QueryPostprocessDataContext extends AbstractDataContext im
 
                     // check for simple queries with or without simple criteria
                     if (orderByItems.isEmpty()) {
+                        // no WHERE criteria set
+                        if (whereItems.isEmpty()) {
+                            final DataSet dataSet = materializeTable(table, selectItems, firstRow, maxRows);
+                            return dataSet;
+                        }
+
                         final DataSet dataSet = materializeTable(table, selectItems, whereItems, firstRow, maxRows);
                         return dataSet;
                     }
@@ -208,8 +197,8 @@ public abstract class QueryPostprocessDataContext extends AbstractDataContext im
 
         // we can now exclude the select items imposed by the WHERE clause (and
         // should, to make the aggregation process faster)
-        workSelectItems =
-                CollectionUtils.concat(true, selectItems, groupBySelectItems, havingSelectItems, orderBySelectItems);
+        workSelectItems = CollectionUtils.concat(true, selectItems, groupBySelectItems, havingSelectItems,
+                orderBySelectItems);
 
         if (groupByItems.size() > 0) {
             dataSet = MetaModelHelper.getGrouped(workSelectItems, dataSet, groupByItems);
@@ -232,7 +221,8 @@ public abstract class QueryPostprocessDataContext extends AbstractDataContext im
     }
 
     /**
-     * Determines if all the select items are 'simple' meaning that they just represent scans of values in columns.
+     * Determines if all the select items are 'simple' meaning that they just
+     * represent scans of values in columns.
      *
      * @param clause
      * @return
@@ -250,13 +240,17 @@ public abstract class QueryPostprocessDataContext extends AbstractDataContext im
     }
 
     /**
-     * Executes a simple count query, if possible. This method is provided to allow subclasses to optimize count queries
-     * since they are quite common and often a datastore can retrieve the count using some specialized means which is
-     * much more performant than counting all records manually.
+     * Executes a simple count query, if possible. This method is provided to
+     * allow subclasses to optimize count queries since they are quite common
+     * and often a datastore can retrieve the count using some specialized means
+     * which is much more performant than counting all records manually.
      * 
-     * @param table the table on which the count is requested.
-     * @param whereItems a (sometimes empty) list of WHERE items.
-     * @param functionApproximationAllowed whether approximation is allowed or not.
+     * @param table
+     *            the table on which the count is requested.
+     * @param whereItems
+     *            a (sometimes empty) list of WHERE items.
+     * @param functionApproximationAllowed
+     *            whether approximation is allowed or not.
      * @return the count of the particular table, or null if not available.
      */
     protected Number executeCountQuery(Table table, List<FilterItem> whereItems, boolean functionApproximationAllowed) {
@@ -264,14 +258,20 @@ public abstract class QueryPostprocessDataContext extends AbstractDataContext im
     }
 
     /**
-     * Executes a query which obtains a row by primary key (as defined by {@link Column#isPrimaryKey()}). This method is
-     * provided to allow subclasses to optimize lookup queries since they are quite common and often a datastore can
-     * retrieve the row using some specialized means which is much more performant than scanning all records manually.
+     * Executes a query which obtains a row by primary key (as defined by
+     * {@link Column#isPrimaryKey()}). This method is provided to allow
+     * subclasses to optimize lookup queries since they are quite common and
+     * often a datastore can retrieve the row using some specialized means which
+     * is much more performant than scanning all records manually.
      * 
-     * @param table the table on which the lookup is requested.
-     * @param selectItems the items to select from the lookup query.
-     * @param primaryKeyColumn the column that is the primary key
-     * @param keyValue the primary key value that is specified in the lookup query.
+     * @param table
+     *            the table on which the lookup is requested.
+     * @param selectItems
+     *            the items to select from the lookup query.
+     * @param primaryKeyColumn
+     *            the column that is the primary key
+     * @param keyValue
+     *            the primary key value that is specified in the lookup query.
      * @return the row if the particular table, or null if not available.
      */
     protected Row executePrimaryKeyLookupQuery(Table table, List<SelectItem> selectItems, Column primaryKeyColumn,
@@ -284,9 +284,9 @@ public abstract class QueryPostprocessDataContext extends AbstractDataContext im
         JoinType joinType = fromItem.getJoin();
         if (fromItem.getTable() != null) {
             // We need to materialize a single table
-            final Table table = MetaModelHelper.resolveTable(fromItem);
+            final Table table = fromItem.getTable();
             final List<SelectItem> selectItemsToMaterialize = new ArrayList<SelectItem>();
-            
+
             for (final SelectItem selectItem : selectItems) {
                 final FromItem selectedFromItem = selectItem.getFromItem();
                 if (selectedFromItem != null) {
@@ -313,7 +313,7 @@ public abstract class QueryPostprocessDataContext extends AbstractDataContext im
 
             // Dispatching to the concrete subclass of
             // QueryPostprocessDataContextStrategy
-            dataSet = materializeTable(table, selectItemsToMaterialize, Collections.emptyList(), 1, -1);
+            dataSet = materializeTable(table, selectItemsToMaterialize, 1, -1);
 
         } else if (joinType != null) {
             // We need to (recursively) materialize a joined FromItem
@@ -324,13 +324,13 @@ public abstract class QueryPostprocessDataContext extends AbstractDataContext im
 
             // materialize left side
             final List<SelectItem> leftOn = Arrays.asList(fromItem.getLeftOn());
-            fromItemDataSets[0] =
-                    materializeFromItem(fromItem.getLeftSide(), CollectionUtils.concat(true, selectItems, leftOn));
+            fromItemDataSets[0] = materializeFromItem(fromItem.getLeftSide(),
+                    CollectionUtils.concat(true, selectItems, leftOn));
 
             // materialize right side
             final List<SelectItem> rightOn = Arrays.asList(fromItem.getRightOn());
-            fromItemDataSets[1] =
-                    materializeFromItem(fromItem.getRightSide(), CollectionUtils.concat(true, selectItems, rightOn));
+            fromItemDataSets[1] = materializeFromItem(fromItem.getRightSide(),
+                    CollectionUtils.concat(true, selectItems, rightOn));
 
             final FilterItem[] onConditions = new FilterItem[leftOn.size()];
             for (int i = 0; i < onConditions.length; i++) {
@@ -360,7 +360,6 @@ public abstract class QueryPostprocessDataContext extends AbstractDataContext im
         if (dataSet == null) {
             throw new IllegalStateException("FromItem was not succesfully materialized: " + fromItem);
         }
-        
         return dataSet;
     }
 
@@ -373,11 +372,11 @@ public abstract class QueryPostprocessDataContext extends AbstractDataContext im
         if (selectItems == null || selectItems.isEmpty()) {
             // add any column (typically this occurs because of COUNT(*)
             // queries)
-            List<Column> columns = table.getColumns();
-            if (columns.size() == 0) {
+            Column[] columns = table.getColumns();
+            if (columns.length == 0) {
                 logger.warn("Queried table has no columns: {}", table);
             } else {
-                selectItems.add(new SelectItem(columns.get(0)));
+                selectItems.add(new SelectItem(columns[0]));
             }
         }
 
@@ -391,8 +390,8 @@ public abstract class QueryPostprocessDataContext extends AbstractDataContext im
 
         final DataSet dataSet;
         if (INFORMATION_SCHEMA_NAME.equals(schemaName)) {
-            DataSet informationDataSet =
-                    materializeInformationSchemaTable(table, buildWorkingSelectItems(selectItems, whereItems));
+            DataSet informationDataSet = materializeInformationSchemaTable(table,
+                    buildWorkingSelectItems(selectItems, whereItems));
             informationDataSet = MetaModelHelper.getFiltered(informationDataSet, whereItems);
             informationDataSet = MetaModelHelper.getSelection(selectItems, informationDataSet);
             informationDataSet = MetaModelHelper.getPaged(informationDataSet, firstRow, maxRows);
@@ -402,36 +401,47 @@ public abstract class QueryPostprocessDataContext extends AbstractDataContext im
 
             // conversion is done at materialization time, since it enables
             // the refined types to be used also in eg. where clauses.
-            dataSet = new ConvertedDataSetInterceptor(converters).intercept(tableDataSet);
+            dataSet = new ConvertedDataSetInterceptor(_converters).intercept(tableDataSet);
         }
 
         return dataSet;
     }
 
     private List<SelectItem> buildWorkingSelectItems(List<SelectItem> selectItems, List<FilterItem> whereItems) {
-        if (whereItems == null || whereItems.isEmpty()) {
-            return selectItems;
+        final List<SelectItem> primarySelectItems = new ArrayList<>(selectItems.size());
+        for (SelectItem selectItem : selectItems) {
+            final ScalarFunction scalarFunction = selectItem.getScalarFunction();
+            if (scalarFunction == null || isScalarFunctionMaterialized(scalarFunction)) {
+                primarySelectItems.add(selectItem);
+            } else {
+                final SelectItem copySelectItem = selectItem.replaceFunction(null);
+                primarySelectItems.add(copySelectItem);
+            }
         }
         final List<SelectItem> evaluatedSelectItems = MetaModelHelper.getEvaluatedSelectItems(whereItems);
-        
-        final LinkedHashSet<SelectItem> workingSelectItems = new LinkedHashSet<>();
-        workingSelectItems.addAll(selectItems);
-        workingSelectItems.addAll(evaluatedSelectItems);
-        return new ArrayList<>(workingSelectItems);
+        return CollectionUtils.concat(true, primarySelectItems, evaluatedSelectItems);
     }
 
     /**
-     * Determines if the subclass of this class can materialize {@link SelectItem}s with the given
-     * {@link ScalarFunction}. Usually scalar functions are applied by MetaModel on the client side, but when possible
-     * they can also be handled by e.g. {@link #materializeMainSchemaTable(Table, List, int, int)} and
-     * {@link #materializeMainSchemaTable(Table, List, List, int, int)} in which case MetaModel will not evaluate it
-     * client-side.
+     * Determines if the subclass of this class can materialize
+     * {@link SelectItem}s with the given {@link ScalarFunction}. Usually scalar
+     * functions are applied by MetaModel on the client side, but when possible
+     * they can also be handled by e.g.
+     * {@link #materializeMainSchemaTable(Table, List, int, int)} and
+     * {@link #materializeMainSchemaTable(Table, List, List, int, int)} in which
+     * case MetaModel will not evaluate it client-side.
      * 
      * @param function
      * @return
      */
     protected boolean isScalarFunctionMaterialized(ScalarFunction function) {
         return false;
+    }
+
+    @Deprecated
+    protected DataSet materializeTable(final Table table, final List<SelectItem> selectItems, final int firstRow,
+            final int maxRows) {
+        return materializeTable(table, selectItems, Collections.<FilterItem> emptyList(), firstRow, maxRows);
     }
 
     protected boolean isMainSchemaTable(Table table) {
@@ -444,10 +454,10 @@ public abstract class QueryPostprocessDataContext extends AbstractDataContext im
     }
 
     @Override
-    protected final List<String> getSchemaNamesInternal() throws MetaModelException {
-        final List<String> schemaNames = new ArrayList<>();
-        schemaNames.add(INFORMATION_SCHEMA_NAME);
-        schemaNames.add(getMainSchemaName());
+    protected final String[] getSchemaNamesInternal() throws MetaModelException {
+        final String[] schemaNames = new String[2];
+        schemaNames[0] = INFORMATION_SCHEMA_NAME;
+        schemaNames[1] = getMainSchemaName();
         return schemaNames;
     }
 
@@ -459,18 +469,15 @@ public abstract class QueryPostprocessDataContext extends AbstractDataContext im
     @Override
     protected final Schema getSchemaByNameInternal(final String name) throws MetaModelException {
         final String mainSchemaName = getMainSchemaName();
-        if (name == null && mainSchemaName != null) {
+        if (name == null) {
+            if (mainSchemaName == null) {
+                return getMainSchema();
+            }
             return null;
         }
 
-        if (name == null || name.equalsIgnoreCase(mainSchemaName)) {
-            final Schema mainSchema = getMainSchema();
-            final boolean createAliasTable = singleTableDatastore
-                    && Boolean.parseBoolean(System.getProperty(SYSTEM_PROPERTY_CREATE_DEFAULT_TABLE_ALIAS, "true"));
-            if (createAliasTable) {
-                return DefaultTableAliasedSchema.wrapIfAppropriate(mainSchema);
-            }
-            return mainSchema;
+        if (name.equalsIgnoreCase(mainSchemaName)) {
+            return getMainSchema();
         } else if (name.equals(INFORMATION_SCHEMA_NAME)) {
             return getInformationSchema();
         }
@@ -532,10 +539,9 @@ public abstract class QueryPostprocessDataContext extends AbstractDataContext im
 
     private DataSet materializeInformationSchemaTable(final Table table, final List<SelectItem> selectItems) {
         final String tableName = table.getName();
-        final List<SelectItem> columnSelectItems =
-                table.getColumns().stream().map(SelectItem::new).collect(Collectors.toList());
+        final SelectItem[] columnSelectItems = MetaModelHelper.createSelectItems(table.getColumns());
         final SimpleDataSetHeader header = new SimpleDataSetHeader(columnSelectItems);
-        final List<Table> tables = getDefaultSchema().getTables();
+        final Table[] tables = getDefaultSchema().getTables();
         final List<Row> data = new ArrayList<Row>();
         if ("tables".equals(tableName)) {
             // "tables" columns: name, type, num_columns, remarks
@@ -564,13 +570,13 @@ public abstract class QueryPostprocessDataContext extends AbstractDataContext im
             // "relationships" columns: primary_table, primary_column,
             // foreign_table, foreign_column
             for (Relationship r : getDefaultSchema().getRelationships()) {
-                List<Column> primaryColumns = r.getPrimaryColumns();
-                List<Column> foreignColumns = r.getForeignColumns();
+                Column[] primaryColumns = r.getPrimaryColumns();
+                Column[] foreignColumns = r.getForeignColumns();
                 Table pTable = r.getPrimaryTable();
                 Table fTable = r.getForeignTable();
-                for (int i = 0; i < primaryColumns.size(); i++) {
-                    Column pColumn = primaryColumns.get(i);
-                    Column fColumn = foreignColumns.get(i);
+                for (int i = 0; i < primaryColumns.length; i++) {
+                    Column pColumn = primaryColumns[i];
+                    Column fColumn = foreignColumns[i];
                     data.add(new DefaultRow(header,
                             new Object[] { pTable.getName(), pColumn.getName(), fTable.getName(), fColumn.getName() }));
                 }
@@ -594,14 +600,26 @@ public abstract class QueryPostprocessDataContext extends AbstractDataContext im
     }
 
     /**
-     * Adds a {@link TypeConverter} to this DataContext's query engine (Query Postprocessor) for read operations. Note
-     * that this method should NOT be invoked directly by consuming code. Rather use
-     * {@link Converters#addTypeConverter(DataContext, Column, TypeConverter)} to ensure conversion on both reads and
-     * writes.
+     * 
+     * @return
+     * 
+     * @deprecated use {@link #getDefaultSchema()} instead
+     */
+    @Deprecated
+    protected Schema getMainSchemaInternal() {
+        return getDefaultSchema();
+    }
+
+    /**
+     * Adds a {@link TypeConverter} to this DataContext's query engine (Query
+     * Postprocessor) for read operations. Note that this method should NOT be
+     * invoked directly by consuming code. Rather use
+     * {@link Converters#addTypeConverter(DataContext, Column, TypeConverter)}
+     * to ensure conversion on both reads and writes.
      */
     @Override
     public void addConverter(Column column, TypeConverter<?, ?> converter) {
-        converters.put(column, converter);
+        _converters.put(column, converter);
     }
 
     /**
@@ -615,9 +633,10 @@ public abstract class QueryPostprocessDataContext extends AbstractDataContext im
     protected abstract String getMainSchemaName() throws MetaModelException;
 
     /**
-     * Execute a simple one-table query against a table in the main schema of the subclasses of this class. This default
-     * implementation will delegate to {@link #materializeMainSchemaTable(Table, List, int, int)} and apply WHERE item
-     * filtering afterwards.
+     * Execute a simple one-table query against a table in the main schema of
+     * the subclasses of this class. This default implementation will delegate
+     * to {@link #materializeMainSchemaTable(Table, List, int, int)} and apply
+     * WHERE item filtering afterwards.
      * 
      * @param table
      * @param selectItems
@@ -632,11 +651,11 @@ public abstract class QueryPostprocessDataContext extends AbstractDataContext im
         DataSet dataSet;
         if (whereItems.isEmpty()) {
             // paging is pushed down to materializeMainSchemaTable
-            dataSet = materializeMainSchemaTableSelect(table, workingSelectItems, firstRow, maxRows);
+            dataSet = materializeMainSchemaTable(table, workingSelectItems, firstRow, maxRows);
             dataSet = MetaModelHelper.getSelection(selectItems, dataSet);
         } else {
             // do not push down paging, first we have to apply filtering
-            dataSet = materializeMainSchemaTableSelect(table, workingSelectItems, 1, -1);
+            dataSet = materializeMainSchemaTable(table, workingSelectItems, 1, -1);
             dataSet = MetaModelHelper.getFiltered(dataSet, whereItems);
             dataSet = MetaModelHelper.getPaged(dataSet, firstRow, maxRows);
             dataSet = MetaModelHelper.getSelection(selectItems, dataSet);
@@ -645,19 +664,21 @@ public abstract class QueryPostprocessDataContext extends AbstractDataContext im
     }
 
     /**
-     * Executes a simple one-table query against a table in the main schema of the subclasses of this class. This
-     * default implementation will delegate to {@link #materializeMainSchemaTable(Table, List, int, int)}.
-     *
+     * Executes a simple one-table query against a table in the main schema of
+     * the subclasses of this class. This default implementation will delegate
+     * to {@link #materializeMainSchemaTable(Table, Column[], int, int)}.
+     * 
      * @param table
      * @param selectItems
      * @param firstRow
      * @param maxRows
      * @return
      */
-    protected DataSet materializeMainSchemaTableSelect(Table table, List<SelectItem> selectItems, int firstRow,
-            int maxRows) {
-        List<Column> columns = selectItems.stream().map(si -> si.getColumn()).collect(Collectors.toList());
-
+    protected DataSet materializeMainSchemaTable(Table table, List<SelectItem> selectItems, int firstRow, int maxRows) {
+        Column[] columns = new Column[selectItems.size()];
+        for (int i = 0; i < columns.length; i++) {
+            columns[i] = selectItems.get(i).getColumn();
+        }
         DataSet dataSet = materializeMainSchemaTable(table, columns, firstRow, maxRows);
 
         dataSet = MetaModelHelper.getSelection(selectItems, dataSet);
@@ -666,8 +687,9 @@ public abstract class QueryPostprocessDataContext extends AbstractDataContext im
     }
 
     /**
-     * Executes a simple one-table query against a table in the main schema of the subclasses of this class. This
-     * default implementation will delegate to {@link #materializeMainSchemaTable(Table, List, int)} and apply a
+     * Executes a simple one-table query against a table in the main schema of
+     * the subclasses of this class. This default implementation will delegate
+     * to {@link #materializeMainSchemaTable(Table, Column[], int)} and apply a
      * {@link FirstRowDataSet} if necessary.
      * 
      * @param table
@@ -676,7 +698,7 @@ public abstract class QueryPostprocessDataContext extends AbstractDataContext im
      * @param maxRows
      * @return
      */
-    protected DataSet materializeMainSchemaTable(Table table, List<Column> columns, int firstRow, int maxRows) {
+    protected DataSet materializeMainSchemaTable(Table table, Column[] columns, int firstRow, int maxRows) {
         final int rowsToMaterialize;
         if (firstRow == 1) {
             rowsToMaterialize = maxRows;
@@ -691,12 +713,17 @@ public abstract class QueryPostprocessDataContext extends AbstractDataContext im
     }
 
     /**
-     * Executes a simple one-table query against a table in the main schema of the subclasses of this class.
+     * Executes a simple one-table query against a table in the main schema of
+     * the subclasses of this class.
      * 
-     * @param table the table to query
-     * @param columns the columns of the table to query
-     * @param maxRows the maximum amount of rows needed or -1 if all rows are wanted.
+     * @param table
+     *            the table to query
+     * @param columns
+     *            the columns of the table to query
+     * @param maxRows
+     *            the maximum amount of rows needed or -1 if all rows are
+     *            wanted.
      * @return a dataset with the raw table/column content.
      */
-    protected abstract DataSet materializeMainSchemaTable(Table table, List<Column> columns, int maxRows);
+    protected abstract DataSet materializeMainSchemaTable(Table table, Column[] columns, int maxRows);
 }

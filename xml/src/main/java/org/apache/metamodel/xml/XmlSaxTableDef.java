@@ -20,7 +20,6 @@ package org.apache.metamodel.xml;
 
 import java.io.Serializable;
 import java.util.Arrays;
-import java.util.Collection;
 
 import org.apache.metamodel.schema.Table;
 
@@ -104,12 +103,8 @@ public final class XmlSaxTableDef implements Serializable {
 	 *            /companies/company/employee/gender, index(/companies/company)]
 	 */
 	public XmlSaxTableDef(String rowXpath, String[] valueXpaths) {
-	    _rowXpath = rowXpath;
-	    _valueXpaths = valueXpaths;
-	}
-	
-	public XmlSaxTableDef(String rowXpath, Collection<String> valueXpaths) {
-	    this(rowXpath, valueXpaths.toArray(new String[valueXpaths.size()]));
+		_rowXpath = rowXpath;
+		_valueXpaths = valueXpaths;
 	}
 
 	public String getRowXpath() {

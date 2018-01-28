@@ -20,8 +20,6 @@ package org.apache.metamodel.schema;
 
 import java.io.Serializable;
 import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
 import java.util.List;
 
 /**
@@ -44,20 +42,20 @@ public final class ImmutableSchema extends AbstractSchema implements
 
 	public ImmutableSchema(Schema schema) {
 		this(schema.getName(), schema.getQuote());
-		List<Table> origTables = schema.getTables();
+		Table[] origTables = schema.getTables();
 		for (Table table : origTables) {
 			tables.add(new ImmutableTable(table, this));
 		}
 
-		Collection<Relationship> origRelationships = schema.getRelationships();
+		Relationship[] origRelationships = schema.getRelationships();
 		for (Relationship relationship : origRelationships) {
 			ImmutableRelationship.create(relationship, this);
 		}
 	}
 
 	@Override
-	public List<Table> getTables() {
-		return Collections.unmodifiableList(tables);
+	public Table[] getTables() {
+		return tables.toArray(new Table[tables.size()]);
 	}
 
 	@Override

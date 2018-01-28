@@ -18,6 +18,7 @@
  */
 package org.apache.metamodel.data;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -45,6 +46,9 @@ public final class CachingDataSetHeader extends SimpleDataSetHeader implements D
         super(items);
     }
 
+    public CachingDataSetHeader(SelectItem[] items) {
+        this(Arrays.asList(items));
+    }
 
     @Override
     public int indexOf(Column column) {

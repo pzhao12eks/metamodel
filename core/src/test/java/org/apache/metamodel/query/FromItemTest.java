@@ -27,9 +27,6 @@ import org.apache.metamodel.schema.Relationship;
 import org.apache.metamodel.schema.Schema;
 import org.apache.metamodel.schema.Table;
 
-import java.util.Collection;
-import java.util.List;
-
 public class FromItemTest extends MetaModelTestCase {
 
 	private Schema _schema = getExampleSchema();
@@ -47,9 +44,9 @@ public class FromItemTest extends MetaModelTestCase {
 	public void testRelationJoinToString() throws Exception {
 		Table contributorTable = _schema.getTableByName(TABLE_CONTRIBUTOR);
 		Table roleTable = _schema.getTableByName(TABLE_ROLE);
-		Collection<Relationship> relationships = roleTable
+		Relationship[] relationships = roleTable
 				.getRelationships(contributorTable);
-		FromItem from = new FromItem(JoinType.INNER, relationships.iterator().next());
+		FromItem from = new FromItem(JoinType.INNER, relationships[0]);
 		assertEquals(
 				"MetaModelSchema.contributor INNER JOIN MetaModelSchema.role ON contributor.contributor_id = role.contributor_id",
 				from.toString());
@@ -76,7 +73,7 @@ public class FromItemTest extends MetaModelTestCase {
 		leftSide.setAlias("a");
 		SelectItem[] leftOn = new SelectItem[] { new SelectItem(projectIdColumn) };
 
-		List<Column> columns = roleTable.getColumns();
+		Column[] columns = roleTable.getColumns();
 
 		Query subQuery = new Query();
 		FromItem subQueryFrom = new FromItem(roleTable);
@@ -110,7 +107,7 @@ public class FromItemTest extends MetaModelTestCase {
    
         final QueryPostprocessDataContext dc = new QueryPostprocessDataContext() {
             @Override
-            protected DataSet materializeMainSchemaTable(Table table, List<Column> columns, int maxRows) {
+            protected DataSet materializeMainSchemaTable(Table table, Column[] columns, int maxRows) {
                 throw new UnsupportedOperationException("This method is not used");
             }
 

@@ -21,7 +21,6 @@ package org.apache.metamodel.mongodb.mongo2;
 import java.io.File;
 import java.sql.Connection;
 import java.sql.DriverManager;
-import java.util.List;
 
 import org.apache.metamodel.DataContext;
 import org.apache.metamodel.UpdateCallback;
@@ -96,7 +95,7 @@ public class MongoDbDataCopyer {
                 final Table sourceTable = getSourceTable();
                 final Table targetTable = callback.createTable(targetDataContext.getDefaultSchema(), _collectionName)
                         .like(sourceTable).execute();
-                final List<Column> sourceColumns = sourceTable.getColumns();
+                final Column[] sourceColumns = sourceTable.getColumns();
                 final DataSet dataSet = _sourceDataContext.query().from(sourceTable).select(sourceColumns).execute();
                 while (dataSet.next()) {
                     final Row row = dataSet.getRow();

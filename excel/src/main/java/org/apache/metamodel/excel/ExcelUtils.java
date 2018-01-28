@@ -19,17 +19,37 @@
 package org.apache.metamodel.excel;
 
 import java.io.File;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.text.NumberFormat;
 import java.util.Date;
 import java.util.Iterator;
-import java.util.List;
-import java.util.stream.Collectors;
 
 import javax.xml.parsers.SAXParser;
 import javax.xml.parsers.SAXParserFactory;
 
+import org.apache.poi.hssf.usermodel.HSSFDateUtil;
+import org.apache.poi.hssf.usermodel.HSSFFont;
+import org.apache.poi.hssf.usermodel.HSSFWorkbook;
+import org.apache.poi.hssf.util.HSSFColor;
+import org.apache.poi.ss.formula.FormulaParseException;
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.CellStyle;
+import org.apache.poi.ss.usermodel.Color;
+import org.apache.poi.ss.usermodel.Font;
+import org.apache.poi.ss.usermodel.FontUnderline;
+import org.apache.poi.ss.usermodel.FormulaError;
+import org.apache.poi.ss.usermodel.FormulaEvaluator;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.ss.usermodel.WorkbookFactory;
+import org.apache.poi.xssf.streaming.SXSSFWorkbook;
+import org.apache.poi.xssf.usermodel.XSSFCell;
+import org.apache.poi.xssf.usermodel.XSSFColor;
+import org.apache.poi.xssf.usermodel.XSSFFont;
 import org.apache.metamodel.MetaModelException;
+import org.apache.metamodel.MetaModelHelper;
 import org.apache.metamodel.data.DataSet;
 import org.apache.metamodel.data.DataSetHeader;
 import org.apache.metamodel.data.DefaultRow;
@@ -44,29 +64,9 @@ import org.apache.metamodel.util.DateUtils;
 import org.apache.metamodel.util.FileHelper;
 import org.apache.metamodel.util.FileResource;
 import org.apache.metamodel.util.FormatHelper;
+import org.apache.metamodel.util.Func;
 import org.apache.metamodel.util.InMemoryResource;
 import org.apache.metamodel.util.Resource;
-import org.apache.poi.hssf.usermodel.HSSFDateUtil;
-import org.apache.poi.hssf.usermodel.HSSFFont;
-import org.apache.poi.hssf.usermodel.HSSFWorkbook;
-import org.apache.poi.hssf.util.HSSFColor;
-import org.apache.poi.ss.formula.FormulaParseException;
-import org.apache.poi.ss.usermodel.Cell;
-import org.apache.poi.ss.usermodel.CellStyle;
-import org.apache.poi.ss.usermodel.Color;
-import org.apache.poi.ss.usermodel.FillPatternType;
-import org.apache.poi.ss.usermodel.Font;
-import org.apache.poi.ss.usermodel.FontUnderline;
-import org.apache.poi.ss.usermodel.FormulaError;
-import org.apache.poi.ss.usermodel.FormulaEvaluator;
-import org.apache.poi.ss.usermodel.Row;
-import org.apache.poi.ss.usermodel.Sheet;
-import org.apache.poi.ss.usermodel.Workbook;
-import org.apache.poi.ss.usermodel.WorkbookFactory;
-import org.apache.poi.xssf.streaming.SXSSFWorkbook;
-import org.apache.poi.xssf.usermodel.XSSFCell;
-import org.apache.poi.xssf.usermodel.XSSFColor;
-import org.apache.poi.xssf.usermodel.XSSFFont;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.xml.sax.XMLReader;
@@ -115,12 +115,15 @@ final class ExcelUtils {
             }
         }
 
-        return resource.read(inputStream -> {
-            try {
-                return WorkbookFactory.create(inputStream);
-            } catch (Exception e) {
-                logger.error("Could not open workbook", e);
-                throw new IllegalStateException("Could not open workbook", e);
+        return resource.read(new Func<InputStream, Workbook>() {
+            @Override
+            public Workbook eval(InputStream inputStream) {
+                try {
+                    return WorkbookFactory.create(inputStream);
+                } catch (Exception e) {
+                    logger.error("Could not open workbook", e);
+                    throw new IllegalStateException("Could not open workbook", e);
+                }
             }
         });
     }
@@ -143,8 +146,8 @@ final class ExcelUtils {
     }
 
     /**
-     * Writes the {@link Workbook} to a {@link Resource}. The {@link Workbook} will be closed as a result of this
-     * operation!
+     * Writes the {@link Workbook} to a {@link Resource}. The {@link Workbook}
+     * will be closed as a result of this operation!
      * 
      * @param dataContext
      * @param wb
@@ -189,15 +192,14 @@ final class ExcelUtils {
 
         final String result;
 
-        switch (cell.getCellTypeEnum()) {
-        case BLANK:
-        case _NONE:
+        switch (cell.getCellType()) {
+        case Cell.CELL_TYPE_BLANK:
             result = null;
             break;
-        case BOOLEAN:
+        case Cell.CELL_TYPE_BOOLEAN:
             result = Boolean.toString(cell.getBooleanCellValue());
             break;
-        case ERROR:
+        case Cell.CELL_TYPE_ERROR:
             String errorResult;
             try {
                 byte errorCode = cell.getErrorCellValue();
@@ -216,11 +218,11 @@ final class ExcelUtils {
             }
             result = errorResult;
             break;
-        case FORMULA:
+        case Cell.CELL_TYPE_FORMULA:
             // result = cell.getCellFormula();
             result = getFormulaCellValue(wb, cell);
             break;
-        case NUMERIC:
+        case Cell.CELL_TYPE_NUMERIC:
             if (HSSFDateUtil.isCellDateFormatted(cell)) {
                 Date date = cell.getDateCellValue();
                 if (date == null) {
@@ -234,11 +236,11 @@ final class ExcelUtils {
                 result = _numberFormat.format(cell.getNumericCellValue());
             }
             break;
-        case STRING:
+        case Cell.CELL_TYPE_STRING:
             result = cell.getRichStringCellValue().getString();
             break;
         default:
-            throw new IllegalStateException("Unknown cell type: " + cell.getCellTypeEnum());
+            throw new IllegalStateException("Unknown cell type: " + cell.getCellType());
         }
 
         logger.debug("cell {} resolved to value: {}", cellCoordinate, result);
@@ -262,8 +264,8 @@ final class ExcelUtils {
         // evaluate cell first, if possible
         try {
             if (logger.isInfoEnabled()) {
-                logger.info("cell({},{}) is a formula. Attempting to evaluate: {}",
-                        new Object[] { cell.getRowIndex(), cell.getColumnIndex(), cell.getCellFormula() });
+                logger.info("cell({},{}) is a formula. Attempting to evaluate: {}", new Object[] { cell.getRowIndex(),
+                        cell.getColumnIndex(), cell.getCellFormula() });
             }
 
             final FormulaEvaluator evaluator = wb.getCreationHelper().createFormulaEvaluator();
@@ -301,7 +303,7 @@ final class ExcelUtils {
         final StyleBuilder styleBuilder = new StyleBuilder();
 
         // Font bold, italic, underline
-        if (font.getBold()) {
+        if (font.getBoldweight() >= Font.BOLDWEIGHT_BOLD) {
             styleBuilder.bold();
         }
         if (font.getItalic()) {
@@ -344,7 +346,7 @@ final class ExcelUtils {
         }
 
         // Background color
-        if (cellStyle.getFillPatternEnum() == FillPatternType.SOLID_FOREGROUND) {
+        if (cellStyle.getFillPattern() == 1) {
             Color color = cellStyle.getFillForegroundColorColor();
             if (color instanceof HSSFColor) {
                 short[] triplet = ((HSSFColor) color).getTriplet();
@@ -357,27 +359,24 @@ final class ExcelUtils {
                     styleBuilder.background(argb.substring(2));
                 }
             } else {
-                throw new IllegalStateException(
-                        "Unexpected color type: " + (color == null ? "null" : color.getClass()) + ")");
+                throw new IllegalStateException("Unexpected color type: " + (color == null ? "null" : color.getClass())
+                        + ")");
             }
         }
 
         // alignment
-        switch (cellStyle.getAlignmentEnum()) {
-        case LEFT:
+        switch (cellStyle.getAlignment()) {
+        case CellStyle.ALIGN_LEFT:
             styleBuilder.leftAligned();
             break;
-        case RIGHT:
+        case CellStyle.ALIGN_RIGHT:
             styleBuilder.rightAligned();
             break;
-        case CENTER:
+        case CellStyle.ALIGN_CENTER:
             styleBuilder.centerAligned();
             break;
-        case JUSTIFY:
+        case CellStyle.ALIGN_JUSTIFY:
             styleBuilder.justifyAligned();
-            break;
-        default:
-            // we currently don't support other alignment styles
             break;
         }
 
@@ -418,7 +417,8 @@ final class ExcelUtils {
      * 
      * @param workbook
      * @param row
-     * @param selectItems select items of the columns in the table
+     * @param selectItems
+     *            select items of the columns in the table
      * @return
      */
     public static DefaultRow createRow(Workbook workbook, Row row, DataSetHeader header) {
@@ -440,8 +440,7 @@ final class ExcelUtils {
     }
 
     public static DataSet getDataSet(Workbook workbook, Sheet sheet, Table table, ExcelConfiguration configuration) {
-        final List<SelectItem> selectItems =
-                table.getColumns().stream().map(SelectItem::new).collect(Collectors.toList());
+        final SelectItem[] selectItems = MetaModelHelper.createSelectItems(table.getColumns());
         final Iterator<Row> rowIterator = getRowIterator(sheet, configuration, true);
         if (!rowIterator.hasNext()) {
             // no more rows!

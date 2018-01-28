@@ -27,13 +27,12 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.function.Supplier;
-import java.util.stream.Collectors;
 
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 
 import org.apache.metamodel.MetaModelException;
+import org.apache.metamodel.MetaModelHelper;
 import org.apache.metamodel.QueryPostprocessDataContext;
 import org.apache.metamodel.data.CachingDataSetHeader;
 import org.apache.metamodel.data.DataSet;
@@ -58,6 +57,7 @@ import org.apache.metamodel.schema.TableType;
 import org.apache.metamodel.util.FileResource;
 import org.apache.metamodel.util.ImmutableRef;
 import org.apache.metamodel.util.NumberComparator;
+import org.apache.metamodel.util.Ref;
 import org.apache.metamodel.util.Resource;
 import org.apache.metamodel.util.UrlResource;
 import org.slf4j.Logger;
@@ -97,7 +97,7 @@ public class XmlDomDataContext extends QueryPostprocessDataContext {
 
     private static final String TEXT_CONTENT_TEMP_SUFFIX = "_metamodel_text_content";
 
-    private final Supplier<InputSource> _inputSourceRef;
+    private final Ref<InputSource> _inputSourceRef;
     private final Map<String, List<Object[]>> _tableData = new HashMap<String, List<Object[]>>();;
     private final String _schemaName;
 
@@ -112,7 +112,6 @@ public class XmlDomDataContext extends QueryPostprocessDataContext {
      * @param autoFlattenTables
      */
     public XmlDomDataContext(String schemaName, Document document, boolean autoFlattenTables) {
-        super(false);
         _autoFlattenTables = autoFlattenTables;
         _schemaName = schemaName;
         _schema = new MutableSchema(_schemaName);
@@ -134,7 +133,6 @@ public class XmlDomDataContext extends QueryPostprocessDataContext {
      *             if the file does not exist
      */
     public XmlDomDataContext(Resource resource, boolean autoFlattenTables) throws IllegalArgumentException {
-        super(false);
         _inputSourceRef = createInputSourceRef(resource);
         _schemaName = resource.getName();
         _autoFlattenTables = autoFlattenTables;
@@ -145,7 +143,6 @@ public class XmlDomDataContext extends QueryPostprocessDataContext {
     }
 
     public XmlDomDataContext(InputSource inputSource, String schemaName, boolean autoFlattenTables) {
-        super(false);
         _inputSourceRef = new ImmutableRef<InputSource>(inputSource);
         _schemaName = schemaName;
         _autoFlattenTables = autoFlattenTables;
@@ -155,10 +152,13 @@ public class XmlDomDataContext extends QueryPostprocessDataContext {
         this(new UrlResource(url), autoFlattenTables);
     }
 
-    private static Supplier<InputSource> createInputSourceRef(final Resource resource) {
-        return () -> {
+    private static Ref<InputSource> createInputSourceRef(final Resource resource) {
+        return new Ref<InputSource>() {
+            @Override
+            public InputSource get() {
                 final InputStream in = resource.read();
                 return new InputSource(in);
+            }
         };
     }
 
@@ -181,7 +181,7 @@ public class XmlDomDataContext extends QueryPostprocessDataContext {
     }
 
     @Override
-    public DataSet materializeMainSchemaTable(Table table, List<Column> columnList, int maxRows) {
+    public DataSet materializeMainSchemaTable(Table table, Column[] columns, int maxRows) {
         loadSchema();
         List<Object[]> tableData = _tableData.get(table.getName());
         if (tableData == null) {
@@ -189,9 +189,8 @@ public class XmlDomDataContext extends QueryPostprocessDataContext {
                     + _tableData.keySet());
         }
 
-        final List<SelectItem> selectItems = columnList.stream().map(SelectItem::new).collect(Collectors.toList());
+        final SelectItem[] selectItems = MetaModelHelper.createSelectItems(columns);
         final DataSetHeader header = new CachingDataSetHeader(selectItems);
-        final Column[] columns = columnList.toArray(new Column[columnList.size()]);
 
         final List<Row> resultData = new ArrayList<Row>();
         for (Object[] tableDataRow : tableData) {
@@ -263,7 +262,7 @@ public class XmlDomDataContext extends QueryPostprocessDataContext {
 
         // Remove tables from schema that has no data (typically root
         // node or pure XML structure)
-        Table[] tables = _schema.getTables().toArray(new Table[0]);
+        Table[] tables = _schema.getTables();
         for (Table table : tables) {
             String tableName = table.getName();
             List<Object[]> tableRows = _tableData.get(tableName);
@@ -295,8 +294,7 @@ public class XmlDomDataContext extends QueryPostprocessDataContext {
                     // Rename all text content columns to reasonable
                     // names (preferably element node name)
                     String currentName = textContentColumn.getName();
-                    String preferredName = currentName.substring(0, currentName.length() - TEXT_CONTENT_TEMP_SUFFIX
-                            .length());
+                    String preferredName = currentName.substring(0, currentName.length() - TEXT_CONTENT_TEMP_SUFFIX.length());
                     column = (MutableColumn) table.getColumnByName(preferredName);
                     if (column == null) {
                         textContentColumn.setName(preferredName);
@@ -329,13 +327,12 @@ public class XmlDomDataContext extends QueryPostprocessDataContext {
 
                 if (parentKeyColumn != null) {
                     Table parentTable = parentKeyColumn.getTable();
-                    foreignKeyColumn = new MutableColumn(parentTable.getName() + "_id", parentKeyColumn.getType(),
-                            table, table.getColumnCount(), false);
+                    foreignKeyColumn = new MutableColumn(parentTable.getName() + "_id", parentKeyColumn.getType(), table,
+                            table.getColumnCount(), false);
                     foreignKeyColumn.setNativeType(NATIVE_TYPE_FOREIGN_KEY);
                     table.addColumn(foreignKeyColumn);
 
-                    MutableRelationship.createRelationship(parentKeyColumn ,
-                            foreignKeyColumn);
+                    MutableRelationship.createRelationship(new Column[] { parentKeyColumn }, new Column[] { foreignKeyColumn });
 
                 } else {
                     foreignKeyColumn = null;
@@ -343,7 +340,7 @@ public class XmlDomDataContext extends QueryPostprocessDataContext {
             } else {
                 idColumn = getIdColumn(table);
                 tableRows = _tableData.get(tableName);
-                Column[] foreignKeys = table.getForeignKeys().toArray(new Column[0]);
+                Column[] foreignKeys = table.getForeignKeys();
                 if (foreignKeys.length == 1) {
                     foreignKeyColumn = (MutableColumn) foreignKeys[0];
                 } else {
@@ -405,8 +402,9 @@ public class XmlDomDataContext extends QueryPostprocessDataContext {
     }
 
     private Column getTextContentColumn(MutableTable table, String preferredColumnName) {
+        Column[] columns = table.getColumns();
         MutableColumn column = null;
-        for (Column col : table.getColumns()) {
+        for (Column col : columns) {
             if (NATIVE_TYPE_TEXT.equals(col.getNativeType())) {
                 column = (MutableColumn) col;
                 break;
@@ -414,8 +412,8 @@ public class XmlDomDataContext extends QueryPostprocessDataContext {
         }
         if (column == null && preferredColumnName != null) {
             logger.info("Creating text content column for table: " + table.getName());
-            column = new MutableColumn(preferredColumnName + TEXT_CONTENT_TEMP_SUFFIX, ColumnType.STRING, table, table
-                    .getColumnCount(), true);
+            column = new MutableColumn(preferredColumnName + TEXT_CONTENT_TEMP_SUFFIX, ColumnType.STRING, table,
+                    table.getColumnCount(), true);
             column.setNativeType(NATIVE_TYPE_TEXT);
             table.addColumn(column);
         }
@@ -423,8 +421,9 @@ public class XmlDomDataContext extends QueryPostprocessDataContext {
     }
 
     private MutableColumn getIdColumn(MutableTable table) {
+        Column[] columns = table.getColumns();
         MutableColumn column = null;
-        for (Column col : table.getColumns()) {
+        for (Column col : columns) {
             if (NATIVE_TYPE_PRIMARY_KEY.equals(col.getNativeType())) {
                 column = (MutableColumn) col;
                 break;
@@ -433,8 +432,8 @@ public class XmlDomDataContext extends QueryPostprocessDataContext {
         if (column == null) {
             String tableName = table.getName();
             logger.info("Creating id column for table: " + tableName);
-            column = new MutableColumn(tableName + "_metamodel_surrogate_id", ColumnType.INTEGER, table, table
-                    .getColumnCount(), false);
+            column = new MutableColumn(tableName + "_metamodel_surrogate_id", ColumnType.INTEGER, table, table.getColumnCount(),
+                    false);
             column.setNativeType(NATIVE_TYPE_PRIMARY_KEY);
             column.setIndexed(true);
             table.addColumn(column);
@@ -509,8 +508,8 @@ public class XmlDomDataContext extends QueryPostprocessDataContext {
         // Check that foreignTable is not primary table in other relationships
         // (if so we can't flatten as that would require id-rewriting of those
         // foreign tables as well)
-        if (foreignTable.getPrimaryKeyRelationships().size() != 0) {
-            Relationship[] foreignPrimaryRelationships = foreignTable.getPrimaryKeyRelationships().toArray(new Relationship[0]);
+        if (foreignTable.getPrimaryKeyRelationships().length != 0) {
+            Relationship[] foreignPrimaryRelationships = foreignTable.getPrimaryKeyRelationships();
             String[] foreignPrimaryNames = new String[foreignPrimaryRelationships.length];
             for (int i = 0; i < foreignPrimaryRelationships.length; i++) {
                 foreignPrimaryNames[i] = foreignPrimaryRelationships[i].getForeignTable().getName();
@@ -519,8 +518,8 @@ public class XmlDomDataContext extends QueryPostprocessDataContext {
                     + "' as it acts as primary table for tables: " + Arrays.toString(foreignPrimaryNames));
         }
 
-        List<Column> primaryColumns = new ArrayList<Column>(primaryTable.getColumns());
-        List<Column> foreignColumns = new ArrayList<Column>(foreignTable.getColumns());
+        List<Column> primaryColumns = new ArrayList<Column>(Arrays.asList(primaryTable.getColumns()));
+        List<Column> foreignColumns = new ArrayList<Column>(Arrays.asList(foreignTable.getColumns()));
 
         // Remove the surrogate id
         String primaryTableName = primaryTable.getName();
@@ -529,14 +528,14 @@ public class XmlDomDataContext extends QueryPostprocessDataContext {
         foreignColumns.remove(idColumn);
 
         // Remove the foreign keys
-        Column[] foreignKeys = foreignTable.getForeignKeys().toArray(new Column[0]);
+        Column[] foreignKeys = foreignTable.getForeignKeys();
         for (Column foreignKey : foreignKeys) {
             foreignColumns.remove(foreignKey);
         }
 
         Query q = new Query();
-        q.select(primaryColumns);
-        q.select(foreignColumns);
+        q.select(primaryColumns.toArray(new Column[primaryColumns.size()]));
+        q.select(foreignColumns.toArray(new Column[foreignColumns.size()]));
         q.from(new FromItem(JoinType.LEFT, relationship));
         if (logger.isDebugEnabled()) {
             logger.debug("Setting table data for '{}' to query result: {}", primaryTableName, q.toString());
@@ -544,8 +543,8 @@ public class XmlDomDataContext extends QueryPostprocessDataContext {
         List<Object[]> tableRows = executeQuery(q).toObjectArrays();
 
         for (Column foreignColumn : foreignColumns) {
-            MutableColumn newPrimaryColumn = new MutableColumn(foreignColumn.getName(), foreignColumn.getType(),
-                    primaryTable, primaryTable.getColumnCount(), foreignColumn.isNullable());
+            MutableColumn newPrimaryColumn = new MutableColumn(foreignColumn.getName(), foreignColumn.getType(), primaryTable,
+                    primaryTable.getColumnCount(), foreignColumn.isNullable());
             newPrimaryColumn.setIndexed(foreignColumn.isIndexed());
             newPrimaryColumn.setNativeType(foreignColumn.getNativeType());
             primaryTable.addColumn(newPrimaryColumn);
@@ -559,10 +558,9 @@ public class XmlDomDataContext extends QueryPostprocessDataContext {
         ((MutableRelationship) relationship).remove();
 
         if (logger.isInfoEnabled()) {
-            logger.info("Tables '" + primaryTableName + "' and '" + foreignTableName + "' flattened to: "
-                    + primaryTableName);
+            logger.info("Tables '" + primaryTableName + "' and '" + foreignTableName + "' flattened to: " + primaryTableName);
             if (logger.isDebugEnabled()) {
-                logger.debug(primaryTableName + " columns: " + Arrays.toString(primaryTable.getColumns().toArray()));
+                logger.debug(primaryTableName + " columns: " + Arrays.toString(primaryTable.getColumns()));
             }
         }
 
@@ -576,21 +574,21 @@ public class XmlDomDataContext extends QueryPostprocessDataContext {
      * mapped tables).
      */
     public XmlDomDataContext autoFlattenTables() {
-        Table[] tables = _schema.getTables().toArray(new Table[0]);
+        Table[] tables = _schema.getTables();
         for (Table table : tables) {
             // First check to see that this table still exist (ie. has not been
             // flattened in a previous loop)
             if (_tableData.containsKey(table.getName())) {
                 // Find all tables that represent inner tags
-                Relationship[] foreignKeyRelationships = table.getForeignKeyRelationships().toArray(new Relationship[0]);
-                if (foreignKeyRelationships.length == 1 && table.getPrimaryKeyRelationships().size() == 0) {
+                Relationship[] foreignKeyRelationships = table.getForeignKeyRelationships();
+                if (foreignKeyRelationships.length == 1 && table.getPrimaryKeyRelationships().length == 0) {
                     Relationship foreignKeyRelationship = foreignKeyRelationships[0];
 
                     // If there is exactly one inner tag then we can probably
                     // flatten the tables, but it's only relevant if the inner
                     // tag only carry a single data column
                     int nonDataColumns = 0;
-                    Column[] columns = table.getColumns().toArray(new Column[0]);
+                    Column[] columns = table.getColumns();
                     for (Column column : columns) {
                         String nativeType = column.getNativeType();
                         // Use the native column type constants to determine if
@@ -607,11 +605,10 @@ public class XmlDomDataContext extends QueryPostprocessDataContext {
                         // multiplicity)
                         boolean uniqueForeignKeys = true;
 
-                        Column[] foreignColumns = foreignKeyRelationship.getForeignColumns().toArray(new Column[0]);
+                        Column[] foreignColumns = foreignKeyRelationship.getForeignColumns();
 
                         SelectItem countAllItem = SelectItem.getCountAllItem();
-                        Query q = new Query().select(foreignColumns).select(countAllItem).from(table).groupBy(
-                                foreignColumns);
+                        Query q = new Query().select(foreignColumns).select(countAllItem).from(table).groupBy(foreignColumns);
                         DataSet data = executeQuery(q);
                         Comparable<Object> comparable = NumberComparator.getComparable(1);
                         while (data.next()) {

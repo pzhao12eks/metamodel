@@ -32,7 +32,7 @@ public abstract class LimitOffsetQueryRewriter extends DefaultQueryRewriter {
     }
 
     @Override
-    public final boolean isFirstRowSupported(final Query query) {
+    public final boolean isFirstRowSupported() {
         return true;
     }
 

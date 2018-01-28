@@ -23,33 +23,33 @@ import java.util.List;
 
 public interface QueryClause<E> extends Serializable {
 
-    public QueryClause<E> setItems(@SuppressWarnings("unchecked") E... items);
+	public QueryClause<E> setItems(E... items);
 
-    public QueryClause<E> addItems(@SuppressWarnings("unchecked") E... items);
+	public QueryClause<E> addItems(E... items);
 
-    public QueryClause<E> addItems(Iterable<E> items);
+	public QueryClause<E> addItems(Iterable<E> items);
 
-    public QueryClause<E> addItem(int index, E item);
+	public QueryClause<E> addItem(int index, E item);
+	
+	public QueryClause<E> addItem(E item);
+	
+	public boolean isEmpty();
 
-    public QueryClause<E> addItem(E item);
+	public int getItemCount();
 
-    public boolean isEmpty();
+	public E getItem(int index);
 
-    public int getItemCount();
+	public List<E> getItems();
 
-    public E getItem(int index);
+	public QueryClause<E> removeItem(int index);
 
-    public List<E> getItems();
+	public QueryClause<E> removeItem(E item);
 
-    public QueryClause<E> removeItem(int index);
+	public QueryClause<E> removeItems();
+	
+	public String toSql(boolean includeSchemaInColumnPaths);
 
-    public QueryClause<E> removeItem(E item);
-
-    public QueryClause<E> removeItems();
-
-    public String toSql(boolean includeSchemaInColumnPaths);
-
-    public String toSql();
-
-    public int indexOf(E item);
+	public String toSql();
+	
+	public int indexOf(E item);
 }

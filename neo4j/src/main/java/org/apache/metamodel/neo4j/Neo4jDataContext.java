@@ -22,7 +22,6 @@ import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 import org.apache.http.HttpHost;
 import org.apache.http.client.methods.HttpGet;
@@ -30,6 +29,7 @@ import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.metamodel.DataContext;
 import org.apache.metamodel.MetaModelException;
+import org.apache.metamodel.MetaModelHelper;
 import org.apache.metamodel.QueryPostprocessDataContext;
 import org.apache.metamodel.data.DataSet;
 import org.apache.metamodel.data.DocumentSource;
@@ -72,7 +72,6 @@ public class Neo4jDataContext extends QueryPostprocessDataContext implements Dat
     private String _serviceRoot = "/db/data";
 
     public Neo4jDataContext(String hostname, int port, String username, String password, SimpleTableDef... tableDefs) {
-        super(false);
         _httpHost = new HttpHost(hostname, port);
         final CloseableHttpClient httpClient = HttpClientBuilder.create().build();
         _requestWrapper = new Neo4jRequestWrapper(httpClient, _httpHost, username, password, _serviceRoot);
@@ -81,7 +80,6 @@ public class Neo4jDataContext extends QueryPostprocessDataContext implements Dat
 
     public Neo4jDataContext(String hostname, int port, String username, String password, String serviceRoot,
             SimpleTableDef... tableDefs) {
-        super(false);
         _httpHost = new HttpHost(hostname, port);
         final CloseableHttpClient httpClient = HttpClientBuilder.create().build();
         _requestWrapper = new Neo4jRequestWrapper(httpClient, _httpHost, username, password, _serviceRoot);
@@ -90,7 +88,6 @@ public class Neo4jDataContext extends QueryPostprocessDataContext implements Dat
     }
 
     public Neo4jDataContext(String hostname, int port, String username, String password) {
-        super(false);
         _httpHost = new HttpHost(hostname, port);
         final CloseableHttpClient httpClient = HttpClientBuilder.create().build();
         _requestWrapper = new Neo4jRequestWrapper(httpClient, _httpHost, username, password, _serviceRoot);
@@ -98,7 +95,6 @@ public class Neo4jDataContext extends QueryPostprocessDataContext implements Dat
     }
 
     public Neo4jDataContext(String hostname, int port, String username, String password, String serviceRoot) {
-        super(false);
         _httpHost = new HttpHost(hostname, port);
         final CloseableHttpClient httpClient = HttpClientBuilder.create().build();
         _requestWrapper = new Neo4jRequestWrapper(httpClient, _httpHost, username, password, _serviceRoot);
@@ -107,14 +103,12 @@ public class Neo4jDataContext extends QueryPostprocessDataContext implements Dat
     }
 
     public Neo4jDataContext(String hostname, int port, CloseableHttpClient httpClient) {
-        super(false);
         _httpHost = new HttpHost(hostname, port);
         _requestWrapper = new Neo4jRequestWrapper(httpClient, _httpHost, _serviceRoot);
         _tableDefs = detectTableDefs();
     }
 
     public Neo4jDataContext(String hostname, int port, CloseableHttpClient httpClient, String serviceRoot) {
-        super(false);
         _httpHost = new HttpHost(hostname, port);
         _requestWrapper = new Neo4jRequestWrapper(httpClient, _httpHost, _serviceRoot);
         _tableDefs = detectTableDefs();
@@ -122,7 +116,6 @@ public class Neo4jDataContext extends QueryPostprocessDataContext implements Dat
     }
 
     public Neo4jDataContext(String hostname, int port, CloseableHttpClient httpClient, SimpleTableDef... tableDefs) {
-        super(false);
         _httpHost = new HttpHost(hostname, port);
         _requestWrapper = new Neo4jRequestWrapper(httpClient, _httpHost, _serviceRoot);
         _tableDefs = tableDefs;
@@ -130,7 +123,6 @@ public class Neo4jDataContext extends QueryPostprocessDataContext implements Dat
 
     public Neo4jDataContext(String hostname, int port, CloseableHttpClient httpClient, String serviceRoot,
             SimpleTableDef... tableDefs) {
-        super(false);
         _httpHost = new HttpHost(hostname, port);
         _requestWrapper = new Neo4jRequestWrapper(httpClient, _httpHost, _serviceRoot);
         _tableDefs = tableDefs;
@@ -304,14 +296,14 @@ public class Neo4jDataContext extends QueryPostprocessDataContext implements Dat
     }
 
     @Override
-    protected DataSet materializeMainSchemaTable(Table table, List<Column> columns, int firstRow, int maxRows) {
-        if ((columns != null) && (columns.size() > 0)) {
+    protected DataSet materializeMainSchemaTable(Table table, Column[] columns, int firstRow, int maxRows) {
+        if ((columns != null) && (columns.length > 0)) {
             Neo4jDataSet dataSet = null;
             try {
                 String selectQuery = Neo4jCypherQueryBuilder.buildSelectQuery(table, columns, firstRow, maxRows);
                 String responseJSONString = _requestWrapper.executeCypherQuery(selectQuery);
                 JSONObject resultJSONObject = new JSONObject(responseJSONString);
-                final List<SelectItem> selectItems = columns.stream().map(SelectItem::new).collect(Collectors.toList());
+                final SelectItem[] selectItems = MetaModelHelper.createSelectItems(columns);
                 dataSet = new Neo4jDataSet(selectItems, resultJSONObject);
             } catch (JSONException e) {
                 logger.error("Error occured in parsing JSON while materializing the schema: ", e);
@@ -326,7 +318,7 @@ public class Neo4jDataContext extends QueryPostprocessDataContext implements Dat
     }
 
     @Override
-    protected DataSet materializeMainSchemaTable(Table table, List<Column> columns, int maxRows) {
+    protected DataSet materializeMainSchemaTable(Table table, Column[] columns, int maxRows) {
         return materializeMainSchemaTable(table, columns, 1, maxRows);
     }
 

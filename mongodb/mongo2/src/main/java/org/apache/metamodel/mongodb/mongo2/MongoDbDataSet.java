@@ -18,12 +18,11 @@
  */
 package org.apache.metamodel.mongodb.mongo2;
 
-import java.util.List;
-
 import org.apache.metamodel.data.AbstractDataSet;
 import org.apache.metamodel.data.Row;
 import org.apache.metamodel.mongodb.common.MongoDBUtils;
 import org.apache.metamodel.query.SelectItem;
+import org.apache.metamodel.schema.Column;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -40,9 +39,14 @@ final class MongoDbDataSet extends AbstractDataSet {
     private boolean _closed;
     private volatile DBObject _dbObject;
 
+    public MongoDbDataSet(DBCursor cursor, Column[] columns, boolean queryPostProcessed) {
+        super(columns);
+        _cursor = cursor;
+        _queryPostProcessed = queryPostProcessed;
+        _closed = false;
+    }
 
-
-    public MongoDbDataSet(DBCursor cursor, List<SelectItem> selectItems, boolean queryPostProcessed) {
+    public MongoDbDataSet(DBCursor cursor, SelectItem[] selectItems, boolean queryPostProcessed) {
         super(selectItems);
         _cursor = cursor;
         _queryPostProcessed = queryPostProcessed;

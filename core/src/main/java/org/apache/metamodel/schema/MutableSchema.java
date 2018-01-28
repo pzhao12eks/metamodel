@@ -21,7 +21,6 @@ package org.apache.metamodel.schema;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.List;
 
 /**
@@ -36,11 +35,11 @@ public class MutableSchema extends AbstractSchema implements Serializable,
 	private static final long serialVersionUID = 4465197783868238863L;
 
 	private String _name;
-	private final List<Table> _tables;
+	private final List<MutableTable> _tables;
 
 	public MutableSchema() {
 		super();
-		_tables = new ArrayList<Table>();
+		_tables = new ArrayList<MutableTable>();
 	}
 
 	public MutableSchema(String name) {
@@ -48,7 +47,7 @@ public class MutableSchema extends AbstractSchema implements Serializable,
 		_name = name;
 	}
 
-	public MutableSchema(String name, Table... tables) {
+	public MutableSchema(String name, MutableTable... tables) {
 		this(name);
 		setTables(tables);
 	}
@@ -64,22 +63,22 @@ public class MutableSchema extends AbstractSchema implements Serializable,
 	}
 
 	@Override
-	public List<Table> getTables() {
-		return Collections.unmodifiableList(_tables);
+	public MutableTable[] getTables() {
+		MutableTable[] array = new MutableTable[_tables.size()];
+		return _tables.toArray(array);
 	}
 
-
-	public MutableSchema setTables(Collection<? extends Table> tables) {
+	public MutableSchema setTables(Collection<? extends MutableTable> tables) {
 	    clearTables();
-		for (Table table : tables) {
+		for (MutableTable table : tables) {
 			_tables.add(table);
 		}
 		return this;
 	}
 
-	public MutableSchema setTables(Table... tables) {
+	public MutableSchema setTables(MutableTable... tables) {
 	    clearTables();
-		for (Table table : tables) {
+		for (MutableTable table : tables) {
 			_tables.add(table);
 		}
 		return this;
@@ -90,7 +89,7 @@ public class MutableSchema extends AbstractSchema implements Serializable,
 	    return this;
 	}
 
-	public MutableSchema addTable(Table table) {
+	public MutableSchema addTable(MutableTable table) {
 		_tables.add(table);
 		return this;
 	}

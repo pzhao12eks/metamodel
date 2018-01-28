@@ -19,8 +19,6 @@
 package org.apache.metamodel.schema;
 
 import java.io.Serializable;
-import java.util.Collection;
-import java.util.List;
 
 import org.apache.metamodel.DataContext;
 
@@ -63,14 +61,14 @@ public interface Schema extends Comparable<Schema>, Serializable, NamedStructure
 	 * 
 	 * @return an array of table names.
 	 */
-	public List<String> getTableNames();
+	public String[] getTableNames();
 
 	/**
 	 * Gets all tables in this Schema.
 	 * 
 	 * @return the tables that reside in the schema
 	 */
-	public List<Table> getTables();
+	public Table[] getTables();
 
 	/**
 	 * Gets all tables in this Schema of a particular type.
@@ -80,7 +78,7 @@ public interface Schema extends Comparable<Schema>, Serializable, NamedStructure
 	 * @return an array of tables in this schema that matches the specified
 	 *         type.
 	 */
-	public List<Table> getTables(TableType type);
+	public Table[] getTables(TableType type);
 
 	/**
 	 * Gets a table by index. Use {@link #getTableCount()} to get the (0-based)
@@ -110,7 +108,7 @@ public interface Schema extends Comparable<Schema>, Serializable, NamedStructure
 	 * 
 	 * @return an array of relationships.
 	 */
-	public Collection<Relationship> getRelationships();
+	public Relationship[] getRelationships();
 
 	/**
 	 * Gets the number of relationships to and from this Schema.

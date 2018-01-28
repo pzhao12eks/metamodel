@@ -27,7 +27,7 @@ import java.util.Collections;
  * 
  * @param <E>
  */
-public class InclusionPredicate<E> implements java.util.function.Predicate<E> {
+public class InclusionPredicate<E> implements Predicate<E> {
 
     private final Collection<E> _inclusionList;
 
@@ -36,7 +36,7 @@ public class InclusionPredicate<E> implements java.util.function.Predicate<E> {
     }
 
     @Override
-    public boolean test(E arg) {
+    public Boolean eval(E arg) {
         if (_inclusionList.contains(arg)) {
             return true;
         }

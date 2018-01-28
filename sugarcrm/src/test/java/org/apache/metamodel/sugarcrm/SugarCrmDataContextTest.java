@@ -20,7 +20,6 @@ package org.apache.metamodel.sugarcrm;
 
 import java.util.Arrays;
 import java.util.Date;
-import java.util.List;
 
 import org.apache.metamodel.data.DataSet;
 import org.apache.metamodel.data.InMemoryDataSet;
@@ -108,12 +107,12 @@ public class SugarCrmDataContextTest extends SugarCrmTestCase {
 
         final Schema schema = dataContext.getDefaultSchema();
         final Table table = schema.getTableByName("Prospects");
-        final List<Column> numberColumns = table.getNumberColumns();
-        final List<Column> booleanColumns = table.getBooleanColumns();
-        final List<Column> timeBasedColumns = table.getTimeBasedColumns();
-        assertTrue(numberColumns.size() > 0);
-        assertTrue(booleanColumns.size() > 0);
-        assertTrue(timeBasedColumns.size() > 0);
+        final Column[] numberColumns = table.getNumberColumns();
+        final Column[] booleanColumns = table.getBooleanColumns();
+        final Column[] timeBasedColumns = table.getTimeBasedColumns();
+        assertTrue(numberColumns.length > 0);
+        assertTrue(booleanColumns.length > 0);
+        assertTrue(timeBasedColumns.length > 0);
 
         DataSet ds = dataContext.query().from(table).selectAll().limit(5).execute();
         int rowCounter = 0;
@@ -147,9 +146,9 @@ public class SugarCrmDataContextTest extends SugarCrmTestCase {
         }
         ds.close();
         assertTrue(rowCounter > 0);
-        assertTrue("No non-null values found in: " + Arrays.toString(numberColumns.toArray()), numberCounter > 0);
-        assertTrue("No non-null values found in: " + Arrays.toString(booleanColumns.toArray()), booleanCounter > 0);
-        assertTrue("No non-null values found in: " + Arrays.toString(timeBasedColumns.toArray()), timeBasedCounter > 0);
+        assertTrue("No non-null values found in: " + Arrays.toString(numberColumns), numberCounter > 0);
+        assertTrue("No non-null values found in: " + Arrays.toString(booleanColumns), booleanCounter > 0);
+        assertTrue("No non-null values found in: " + Arrays.toString(timeBasedColumns), timeBasedCounter > 0);
     }
 
     public void testMaxRowsQuery() throws Exception {
@@ -190,7 +189,7 @@ public class SugarCrmDataContextTest extends SugarCrmTestCase {
 
         Table table = schema.getTableByName("Accounts");
 
-        List<String> columnNames = table.getColumnNames();
+        String[] columnNames = table.getColumnNames();
         assertEquals(
                 "[id, name, date_entered, date_modified, modified_user_id, modified_by_name, created_by, created_by_name, "
                         + "description, deleted, assigned_user_id, assigned_user_name, account_type, industry, annual_revenue, phone_fax, "
@@ -200,7 +199,7 @@ public class SugarCrmDataContextTest extends SugarCrmTestCase {
                         + "shipping_address_street_2, shipping_address_street_3, shipping_address_street_4, shipping_address_city, "
                         + "shipping_address_state, shipping_address_postalcode, shipping_address_country, email1, parent_id, sic_code, parent_name, "
                         + "email_opt_out, invalid_email, email, campaign_id, campaign_name]",
-                Arrays.toString(columnNames.toArray()));
+                Arrays.toString(columnNames));
 
         Column nameColumn = table.getColumnByName("name");
         String nativeType = nameColumn.getNativeType();
@@ -208,7 +207,8 @@ public class SugarCrmDataContextTest extends SugarCrmTestCase {
         ColumnType type = nameColumn.getType();
         assertEquals("name|Name:|VARCHAR", nativeType + "|" + remarks + "|" + type);
 
-        for (Column column : table.getColumns()) {
+        Column[] columns = table.getColumns();
+        for (Column column : columns) {
             type = column.getType();
             if (type == null || type == ColumnType.OTHER) {
                 fail("No type mapping for native type: " + column.getNativeType() + " (found in column: " + column
@@ -228,9 +228,10 @@ public class SugarCrmDataContextTest extends SugarCrmTestCase {
                         + "alt_address_postalcode, alt_address_country, assistant, assistant_phone, email_and_name1, lead_source, account_name, account_id, "
                         + "opportunity_role_fields, opportunity_role_id, opportunity_role, reports_to_id, report_to_name, birthdate, campaign_id, campaign_name, "
                         + "c_accept_status_fields, m_accept_status_fields, accept_status_id, accept_status_name, sync_contact]",
-                Arrays.toString(columnNames.toArray()));
+                Arrays.toString(columnNames));
 
-        for (Column column : table.getColumns()) {
+        columns = table.getColumns();
+        for (Column column : columns) {
             type = column.getType();
             if (type == null || type == ColumnType.OTHER) {
                 fail("No type mapping for native type: " + column.getNativeType() + " (found in column: " + column

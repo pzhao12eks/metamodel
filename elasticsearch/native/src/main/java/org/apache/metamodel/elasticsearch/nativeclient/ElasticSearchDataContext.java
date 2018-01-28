@@ -18,30 +18,37 @@
  */
 package org.apache.metamodel.elasticsearch.nativeclient;
 
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 import org.apache.metamodel.DataContext;
+import org.apache.metamodel.MetaModelException;
+import org.apache.metamodel.QueryPostprocessDataContext;
 import org.apache.metamodel.UpdateScript;
-import org.apache.metamodel.UpdateSummary;
+import org.apache.metamodel.UpdateableDataContext;
 import org.apache.metamodel.data.DataSet;
 import org.apache.metamodel.data.DataSetHeader;
 import org.apache.metamodel.data.Row;
 import org.apache.metamodel.data.SimpleDataSetHeader;
-import org.apache.metamodel.elasticsearch.AbstractElasticSearchDataContext;
 import org.apache.metamodel.elasticsearch.common.ElasticSearchMetaData;
-import org.apache.metamodel.elasticsearch.common.ElasticSearchMetaDataParser;
 import org.apache.metamodel.elasticsearch.common.ElasticSearchUtils;
 import org.apache.metamodel.query.FilterItem;
 import org.apache.metamodel.query.LogicalOperator;
 import org.apache.metamodel.query.SelectItem;
 import org.apache.metamodel.schema.Column;
+import org.apache.metamodel.schema.MutableColumn;
+import org.apache.metamodel.schema.MutableSchema;
+import org.apache.metamodel.schema.MutableTable;
+import org.apache.metamodel.schema.Schema;
 import org.apache.metamodel.schema.Table;
 import org.apache.metamodel.util.SimpleTableDef;
+import org.elasticsearch.Version;
 import org.elasticsearch.action.admin.cluster.state.ClusterStateRequestBuilder;
+import org.elasticsearch.action.count.CountResponse;
 import org.elasticsearch.action.get.GetResponse;
 import org.elasticsearch.action.search.SearchRequestBuilder;
 import org.elasticsearch.action.search.SearchResponse;
@@ -50,15 +57,13 @@ import org.elasticsearch.cluster.ClusterState;
 import org.elasticsearch.cluster.metadata.IndexMetaData;
 import org.elasticsearch.cluster.metadata.MappingMetaData;
 import org.elasticsearch.common.collect.ImmutableOpenMap;
+import org.elasticsearch.common.hppc.ObjectLookupContainer;
+import org.elasticsearch.common.hppc.cursors.ObjectCursor;
+import org.elasticsearch.common.unit.TimeValue;
 import org.elasticsearch.index.query.QueryBuilder;
 import org.elasticsearch.index.query.QueryBuilders;
-import org.elasticsearch.index.query.TermQueryBuilder;
-import org.elasticsearch.search.builder.SearchSourceBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.carrotsearch.hppc.ObjectLookupContainer;
-import com.carrotsearch.hppc.cursors.ObjectCursor;
 
 /**
  * DataContext implementation for ElasticSearch analytics engine.
@@ -77,11 +82,19 @@ import com.carrotsearch.hppc.cursors.ObjectCursor;
  * This implementation supports either automatic discovery of a schema or manual
  * specification of a schema, through the {@link SimpleTableDef} class.
  */
-public class ElasticSearchDataContext extends AbstractElasticSearchDataContext {
+public class ElasticSearchDataContext extends QueryPostprocessDataContext implements DataContext, UpdateableDataContext {
 
     private static final Logger logger = LoggerFactory.getLogger(ElasticSearchDataContext.class);
 
+    public static final TimeValue TIMEOUT_SCROLL = TimeValue.timeValueSeconds(60);
+
     private final Client elasticSearchClient;
+    private final String indexName;
+    // Table definitions that are set from the beginning, not supposed to be changed.
+    private final List<SimpleTableDef> staticTableDefinitions;
+
+    // Table definitions that are discovered, these can change
+    private final List<SimpleTableDef> dynamicTableDefinitions = new ArrayList<>();
 
     /**
      * Constructs a {@link ElasticSearchDataContext}. This constructor accepts a
@@ -97,12 +110,15 @@ public class ElasticSearchDataContext extends AbstractElasticSearchDataContext {
      *            and column model of the ElasticSearch index.
      */
     public ElasticSearchDataContext(Client client, String indexName, SimpleTableDef... tableDefinitions) {
-        super(indexName, tableDefinitions);
-
         if (client == null) {
             throw new IllegalArgumentException("ElasticSearch Client cannot be null");
         }
+        if (indexName == null || indexName.trim().length() == 0) {
+            throw new IllegalArgumentException("Invalid ElasticSearch Index name: " + indexName);
+        }
         this.elasticSearchClient = client;
+        this.indexName = indexName;
+        this.staticTableDefinitions = Arrays.asList(tableDefinitions);
         this.dynamicTableDefinitions.addAll(Arrays.asList(detectSchema()));
     }
 
@@ -120,14 +136,40 @@ public class ElasticSearchDataContext extends AbstractElasticSearchDataContext {
         this(client, indexName, new SimpleTableDef[0]);
     }
 
-    @Override
-    protected SimpleTableDef[] detectSchema() {
+    /**
+     * Performs an analysis of the available indexes in an ElasticSearch cluster
+     * {@link Client} instance and detects the elasticsearch types structure
+     * based on the metadata provided by the ElasticSearch java client.
+     *
+     * @see {@link #detectTable(ClusterState, String, String)}
+     * @return a mutable schema instance, useful for further fine tuning by the
+     *         user.
+     */
+    private SimpleTableDef[] detectSchema() {
         logger.info("Detecting schema for index '{}'", indexName);
 
-        final ClusterStateRequestBuilder clusterStateRequestBuilder = getElasticSearchClient().admin().cluster()
-                .prepareState().setIndices(indexName);
-        final ClusterState cs = clusterStateRequestBuilder.execute().actionGet().getState();
-        
+        final ClusterState cs;
+        final ClusterStateRequestBuilder clusterStateRequestBuilder =
+                getElasticSearchClient().admin().cluster().prepareState();
+
+        // different methods here to set the index name, so we have to use
+        // reflection :-/
+        try {
+            final byte majorVersion = Version.CURRENT.major;
+            final Object methodArgument = new String[] { indexName };
+            if (majorVersion == 0) {
+                final Method method = ClusterStateRequestBuilder.class.getMethod("setFilterIndices", String[].class);
+                method.invoke(clusterStateRequestBuilder, methodArgument);
+            } else {
+                final Method method = ClusterStateRequestBuilder.class.getMethod("setIndices", String[].class);
+                method.invoke(clusterStateRequestBuilder, methodArgument);
+            }
+        } catch (Exception e) {
+            logger.error("Failed to set index name on ClusterStateRequestBuilder, version {}", Version.CURRENT, e);
+            throw new MetaModelException("Failed to create request for index information needed to detect schema", e);
+        }
+        cs = clusterStateRequestBuilder.execute().actionGet().getState();
+
         final List<SimpleTableDef> result = new ArrayList<>();
 
         final IndexMetaData imd = cs.getMetaData().index(indexName);
@@ -137,8 +179,9 @@ public class ElasticSearchDataContext extends AbstractElasticSearchDataContext {
         } else {
             final ImmutableOpenMap<String, MappingMetaData> mappings = imd.getMappings();
             final ObjectLookupContainer<String> documentTypes = mappings.keys();
-            for (final ObjectCursor<?> documentTypeCursor : documentTypes) {
-                final String documentType = documentTypeCursor.value.toString();
+
+            for (final Object documentTypeCursor : documentTypes) {
+                final String documentType = ((ObjectCursor<?>) documentTypeCursor).value.toString();
                 try {
                     final SimpleTableDef table = detectTable(cs, indexName, documentType);
                     result.add(table);
@@ -147,7 +190,15 @@ public class ElasticSearchDataContext extends AbstractElasticSearchDataContext {
                 }
             }
         }
-        return sortTables(result);
+        final SimpleTableDef[] tableDefArray = result.toArray(new SimpleTableDef[result.size()]);
+        Arrays.sort(tableDefArray, new Comparator<SimpleTableDef>() {
+            @Override
+            public int compare(SimpleTableDef o1, SimpleTableDef o2) {
+                return o1.getName().compareTo(o2.getName());
+            }
+        });
+
+        return tableDefArray;
     }
 
     /**
@@ -170,8 +221,7 @@ public class ElasticSearchDataContext extends AbstractElasticSearchDataContext {
             // index does not exist
             throw new IllegalArgumentException("No such index: " + indexName);
         }
-        final ImmutableOpenMap<String, MappingMetaData> mappings = imd.getMappings();
-        final MappingMetaData mappingMetaData = mappings.get(documentType);
+        final MappingMetaData mappingMetaData = imd.mapping(documentType);
         if (mappingMetaData == null) {
             throw new IllegalArgumentException("No such document type in index '" + indexName + "': " + documentType);
         }
@@ -190,30 +240,66 @@ public class ElasticSearchDataContext extends AbstractElasticSearchDataContext {
     }
 
     @Override
+    protected Schema getMainSchema() throws MetaModelException {
+        final MutableSchema theSchema = new MutableSchema(getMainSchemaName());
+        for (final SimpleTableDef tableDef : staticTableDefinitions) {
+            addTable(theSchema, tableDef);
+        }
+
+        final SimpleTableDef[] tables = detectSchema();
+        synchronized (this) {
+            dynamicTableDefinitions.clear();
+            dynamicTableDefinitions.addAll(Arrays.asList(tables));
+            for (final SimpleTableDef tableDef : dynamicTableDefinitions) {
+                final List<String> tableNames = Arrays.asList(theSchema.getTableNames());
+
+                if (!tableNames.contains(tableDef.getName())) {
+                    addTable(theSchema, tableDef);
+                }
+            }
+        }
+
+        return theSchema;
+    }
+
+    private void addTable(final MutableSchema theSchema, final SimpleTableDef tableDef) {
+        final MutableTable table = tableDef.toTable().setSchema(theSchema);
+        final Column idColumn = table.getColumnByName(ElasticSearchUtils.FIELD_ID);
+        if (idColumn != null && idColumn instanceof MutableColumn) {
+            final MutableColumn mutableColumn = (MutableColumn) idColumn;
+            mutableColumn.setPrimaryKey(true);
+        }
+        theSchema.addTable(table);
+    }
+
+    @Override
+    protected String getMainSchemaName() throws MetaModelException {
+        return indexName;
+    }
+
+    @Override
     protected DataSet materializeMainSchemaTable(Table table, List<SelectItem> selectItems,
             List<FilterItem> whereItems, int firstRow, int maxRows) {
-        final QueryBuilder queryBuilder = ElasticSearchUtils.createQueryBuilderForSimpleWhere(whereItems,
-                LogicalOperator.AND);
+        final QueryBuilder queryBuilder = ElasticSearchUtils.createQueryBuilderForSimpleWhere(whereItems, LogicalOperator.AND);
         if (queryBuilder != null) {
             // where clause can be pushed down to an ElasticSearch query
             final SearchRequestBuilder searchRequest = createSearchRequest(table, firstRow, maxRows, queryBuilder);
             final SearchResponse response = searchRequest.execute().actionGet();
-            return new ElasticSearchDataSet(getElasticSearchClient(), response, selectItems);
+            return new ElasticSearchDataSet(elasticSearchClient, response, selectItems, false);
         }
         return super.materializeMainSchemaTable(table, selectItems, whereItems, firstRow, maxRows);
     }
 
     @Override
-    protected DataSet materializeMainSchemaTable(Table table, List<Column> columns, int maxRows) {
+    protected DataSet materializeMainSchemaTable(Table table, Column[] columns, int maxRows) {
         final SearchRequestBuilder searchRequest = createSearchRequest(table, 1, maxRows, null);
         final SearchResponse response = searchRequest.execute().actionGet();
-        return new ElasticSearchDataSet(getElasticSearchClient(), response, columns.stream().map(SelectItem::new)
-                .collect(Collectors.toList()));
+        return new ElasticSearchDataSet(elasticSearchClient, response, columns, false);
     }
 
     private SearchRequestBuilder createSearchRequest(Table table, int firstRow, int maxRows, QueryBuilder queryBuilder) {
         final String documentType = table.getName();
-        final SearchRequestBuilder searchRequest = getElasticSearchClient().prepareSearch(indexName).setTypes(documentType);
+        final SearchRequestBuilder searchRequest = elasticSearchClient.prepareSearch(indexName).setTypes(documentType);
         if (firstRow > 1) {
             final int zeroBasedFrom = firstRow - 1;
             searchRequest.setFrom(zeroBasedFrom);
@@ -241,7 +327,7 @@ public class ElasticSearchDataContext extends AbstractElasticSearchDataContext {
         final String documentType = table.getName();
         final String id = keyValue.toString();
 
-        final GetResponse response = getElasticSearchClient().prepareGet(indexName, documentType, id).execute().actionGet();
+        final GetResponse response = elasticSearchClient.prepareGet(indexName, documentType, id).execute().actionGet();
 
         if (!response.isExists()) {
             return null;
@@ -252,7 +338,7 @@ public class ElasticSearchDataContext extends AbstractElasticSearchDataContext {
 
         final DataSetHeader header = new SimpleDataSetHeader(selectItems);
 
-        return ElasticSearchUtils.createRow(source, documentId, header);
+        return NativeElasticSearchUtils.createRow(source, documentId, header);
     }
 
     @Override
@@ -262,26 +348,20 @@ public class ElasticSearchDataContext extends AbstractElasticSearchDataContext {
             return null;
         }
         final String documentType = table.getName();
-        final TermQueryBuilder query = QueryBuilders.termQuery("_type", documentType);
-        final SearchResponse searchResponse =
-                getElasticSearchClient().prepareSearch(indexName).setSource(new SearchSourceBuilder().size(0).query(query))
-                        .execute().actionGet();
-        return searchResponse.getHits().getTotalHits();
+        final CountResponse response = elasticSearchClient.prepareCount(indexName)
+                .setQuery(QueryBuilders.termQuery("_type", documentType)).execute().actionGet();
+        return response.getCount();
+    }
+
+    private boolean limitMaxRowsIsSet(int maxRows) {
+        return (maxRows != -1);
     }
 
     @Override
-    public UpdateSummary executeUpdate(UpdateScript update) {
+    public void executeUpdate(UpdateScript update) {
         final ElasticSearchUpdateCallback callback = new ElasticSearchUpdateCallback(this);
         update.run(callback);
         callback.onExecuteUpdateFinished();
-        return callback.getUpdateSummary();
-    }
-
-    @Override
-    protected void onSchemaCacheRefreshed() {
-        getElasticSearchClient().admin().indices().prepareRefresh(indexName).get();
-        
-        detectSchema();
     }
 
     /**
@@ -291,5 +371,14 @@ public class ElasticSearchDataContext extends AbstractElasticSearchDataContext {
      */
     public Client getElasticSearchClient() {
         return elasticSearchClient;
+    }
+
+    /**
+     * Gets the name of the index that this {@link DataContext} is working on.
+     *
+     * @return
+     */
+    public String getIndexName() {
+        return indexName;
     }
 }

@@ -18,8 +18,10 @@
  */
 package org.apache.metamodel.sugarcrm;
 
-import java.util.*;
-import java.util.function.Supplier;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 import org.apache.metamodel.schema.AbstractTable;
 import org.apache.metamodel.schema.Column;
@@ -29,6 +31,7 @@ import org.apache.metamodel.schema.Relationship;
 import org.apache.metamodel.schema.Schema;
 import org.apache.metamodel.schema.TableType;
 import org.apache.metamodel.util.LazyRef;
+import org.apache.metamodel.util.Ref;
 import org.w3c.dom.Node;
 
 import com.sugarcrm.ws.soap.FieldList;
@@ -76,9 +79,9 @@ final class SugarCrmTable extends AbstractTable {
 
     private final String _name;
     private final Schema _schema;
-    private final Supplier<List<Column>> _columnsRef;
+    private final Ref<List<Column>> _columnsRef;
 
-    public SugarCrmTable(String name, Schema schema, final SugarsoapPortType service, final Supplier<String> sessionId) {
+    public SugarCrmTable(String name, Schema schema, final SugarsoapPortType service, final Ref<String> sessionId) {
         _name = name;
         _schema = schema;
         _columnsRef = new LazyRef<List<Column>>() {
@@ -116,9 +119,9 @@ final class SugarCrmTable extends AbstractTable {
     }
 
     @Override
-    public List<Column> getColumns() {
+    public Column[] getColumns() {
         final List<Column> columns = _columnsRef.get();
-        return Collections.unmodifiableList(columns);
+        return columns.toArray(new Column[columns.size()]);
     }
 
     @Override
@@ -132,8 +135,8 @@ final class SugarCrmTable extends AbstractTable {
     }
 
     @Override
-    public List<Relationship> getRelationships() {
-        return new ArrayList<>();
+    public Relationship[] getRelationships() {
+        return new Relationship[0];
     }
 
     @Override

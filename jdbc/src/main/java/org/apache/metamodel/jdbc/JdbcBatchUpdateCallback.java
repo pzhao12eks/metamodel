@@ -61,20 +61,14 @@ final class JdbcBatchUpdateCallback extends JdbcUpdateCallback {
                 }
             }
         } catch (SQLException e) {
-            throw JdbcUtils.wrapException(e, "execute batch: " + preparedStatement, JdbcUtils.JdbcActionType.UPDATE);
+            throw JdbcUtils.wrapException(e, "execute batch: " + preparedStatement);
         } finally {
             FileHelper.safeClose(preparedStatement);
         }
     }
 
     @Override
-    protected int executePreparedStatement(PreparedStatement st) throws SQLException {
+    protected void executePreparedStatement(PreparedStatement st) throws SQLException {
         st.addBatch();
-        return -1;
-    }
-    
-    @Override
-    protected boolean isGeneratedKeysCollectionEnabled() {
-        return false;
     }
 }

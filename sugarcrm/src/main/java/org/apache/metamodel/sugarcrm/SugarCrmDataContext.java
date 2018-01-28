@@ -72,7 +72,6 @@ public class SugarCrmDataContext extends QueryPostprocessDataContext implements 
      */
     public SugarCrmDataContext(String sugarCrmBaseUrl, final String username, String password,
             final String applicationName) {
-        super(false);
         if (sugarCrmBaseUrl.endsWith("/")) {
             // remove trailing slashes
             sugarCrmBaseUrl = sugarCrmBaseUrl.substring(0, sugarCrmBaseUrl.length() - 1);
@@ -148,7 +147,7 @@ public class SugarCrmDataContext extends QueryPostprocessDataContext implements 
     }
 
     @Override
-    protected DataSet materializeMainSchemaTable(final Table table, final List<Column> columns, final int maxRows) {
+    protected DataSet materializeMainSchemaTable(final Table table, final Column[] columns, final int maxRows) {
 
         final String session = _sessionId.get();
         final String moduleName = table.getName();

@@ -19,7 +19,6 @@
 package org.apache.metamodel.data;
 
 import java.util.List;
-import java.util.stream.Collectors;
 
 import org.apache.metamodel.query.SelectItem;
 import org.apache.metamodel.schema.Column;
@@ -33,12 +32,16 @@ public final class EmptyDataSet extends AbstractDataSet {
         super(header);
     }
 
-    public EmptyDataSet(List<SelectItem> selectItems) {
-       this(new SimpleDataSetHeader(selectItems));
+    public EmptyDataSet(SelectItem[] selectItems) {
+        super(new SimpleDataSetHeader(selectItems));
     }
 
-    public static EmptyDataSet fromColumns(List<Column> cols){
-        return new EmptyDataSet(cols.stream().map(SelectItem::new).collect(Collectors.toList()));
+    public EmptyDataSet(Column[] columns) {
+        super(new SimpleDataSetHeader(columns));
+    }
+
+    public EmptyDataSet(List<SelectItem> selectItems) {
+       this(new SimpleDataSetHeader(selectItems));
     }
 
     @Override

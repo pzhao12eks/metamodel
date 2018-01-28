@@ -43,24 +43,24 @@ public abstract class AbstractUpdateCallback implements UpdateCallback {
     @Override
     public TableCreationBuilder createTable(String schemaName, String tableName) throws IllegalArgumentException,
             IllegalStateException {
-        final Schema schema = getSchema(schemaName);
+        Schema schema = getSchema(schemaName);
         return createTable(schema, tableName);
     }
 
     @Override
-    public final TableDropBuilder dropTable(String schemaName, String tableName) throws IllegalArgumentException,
+    public TableDropBuilder dropTable(String schemaName, String tableName) throws IllegalArgumentException,
             IllegalStateException, UnsupportedOperationException {
-        final Table table = getTable(schemaName, tableName);
+        Table table = getTable(schemaName, tableName);
         return dropTable(table);
     }
 
     @Override
-    public final TableDropBuilder dropTable(Schema schema, String tableName) throws IllegalArgumentException,
+    public TableDropBuilder dropTable(Schema schema, String tableName) throws IllegalArgumentException,
             IllegalStateException, UnsupportedOperationException {
-        final Table table = schema.getTableByName(tableName);
+        Table table = schema.getTableByName(tableName);
         if (table == null) {
             throw new IllegalArgumentException("Nu such table '" + tableName + "' found in schema: " + schema
-                    + ". Available tables are: " + Arrays.toString(schema.getTableNames().toArray()));
+                    + ". Available tables are: " + Arrays.toString(schema.getTableNames()));
         }
         return dropTable(table);
     }
@@ -72,7 +72,7 @@ public abstract class AbstractUpdateCallback implements UpdateCallback {
     }
 
     @Override
-    public final RowInsertionBuilder insertInto(String schemaName, String tableName) throws IllegalArgumentException,
+    public RowInsertionBuilder insertInto(String schemaName, String tableName) throws IllegalArgumentException,
             IllegalStateException, UnsupportedOperationException {
         return insertInto(getTable(schemaName, tableName));
     }
@@ -82,7 +82,7 @@ public abstract class AbstractUpdateCallback implements UpdateCallback {
         final Table table = schema.getTableByName(tableName);
         if (table == null) {
             throw new IllegalArgumentException("Nu such table '" + tableName + "' found in schema: " + schema
-                    + ". Available tables are: " + Arrays.toString(schema.getTableNames().toArray()));
+                    + ". Available tables are: " + Arrays.toString(schema.getTableNames()));
         }
         return table;
     }
@@ -101,7 +101,7 @@ public abstract class AbstractUpdateCallback implements UpdateCallback {
     }
 
     @Override
-    public final RowDeletionBuilder deleteFrom(String schemaName, String tableName) throws IllegalArgumentException,
+    public RowDeletionBuilder deleteFrom(String schemaName, String tableName) throws IllegalArgumentException,
             IllegalStateException, UnsupportedOperationException {
         final Table table = getTable(schemaName, tableName);
         return deleteFrom(table);
@@ -138,7 +138,7 @@ public abstract class AbstractUpdateCallback implements UpdateCallback {
 
     @Override
     public boolean isInsertSupported() {
-        // since 2.0 all updateable datacontext have insert into table support
+        // since 2.0 all updateable datacontext have create table support
         return true;
     }
 
@@ -148,7 +148,7 @@ public abstract class AbstractUpdateCallback implements UpdateCallback {
     }
 
     @Override
-    public final RowUpdationBuilder update(String schemaName, String tableName) throws IllegalArgumentException,
+    public RowUpdationBuilder update(String schemaName, String tableName) throws IllegalArgumentException,
             IllegalStateException, UnsupportedOperationException {
         final Table table = getTable(schemaName, tableName);
         return update(table);
@@ -158,9 +158,5 @@ public abstract class AbstractUpdateCallback implements UpdateCallback {
     public RowUpdationBuilder update(Table table) throws IllegalArgumentException, IllegalStateException,
             UnsupportedOperationException {
         return new DeleteAndInsertBuilder(this, table);
-    }
-    
-    public UpdateSummary getUpdateSummary() {
-        return DefaultUpdateSummary.unknownUpdates();
     }
 }

@@ -35,9 +35,9 @@ public class FixedWidthDataContextTest extends TestCase {
     public void testEmptyFile() throws Exception {
         DataContext dc = new FixedWidthDataContext(new File("src/test/resources/empty_file.txt"),
                 new FixedWidthConfiguration(10));
-        assertEquals(2, dc.getDefaultSchema().getTableCount());
+        assertEquals(1, dc.getDefaultSchema().getTableCount());
 
-        Table table = dc.getDefaultSchema().getTables().get(0);
+        Table table = dc.getDefaultSchema().getTables()[0];
         assertEquals("empty_file.txt", table.getName());
         assertEquals(0, table.getColumnCount());
     }
@@ -45,9 +45,9 @@ public class FixedWidthDataContextTest extends TestCase {
     public void testEmptyFileNoHeaderLine() throws Exception {
         DataContext dc = new FixedWidthDataContext(new File("src/test/resources/empty_file.txt"),
                 new FixedWidthConfiguration(FixedWidthConfiguration.NO_COLUMN_NAME_LINE, "UTF8", 10));
-        assertEquals(2, dc.getDefaultSchema().getTableCount());
+        assertEquals(1, dc.getDefaultSchema().getTableCount());
 
-        Table table = dc.getDefaultSchema().getTables().get(0);
+        Table table = dc.getDefaultSchema().getTables()[0];
         assertEquals("empty_file.txt", table.getName());
         assertEquals(0, table.getColumnCount());
     }
@@ -55,9 +55,9 @@ public class FixedWidthDataContextTest extends TestCase {
     public void testUnexistingHeaderLine() throws Exception {
         DataContext dc = new FixedWidthDataContext(new File("src/test/resources/example_simple1.txt"),
                 new FixedWidthConfiguration(20, "UTF8", 10));
-        assertEquals(2, dc.getDefaultSchema().getTableCount());
+        assertEquals(1, dc.getDefaultSchema().getTableCount());
 
-        Table table = dc.getDefaultSchema().getTables().get(0);
+        Table table = dc.getDefaultSchema().getTables()[0];
         assertEquals("example_simple1.txt", table.getName());
         assertEquals(0, table.getColumnCount());
     }
@@ -66,19 +66,19 @@ public class FixedWidthDataContextTest extends TestCase {
         FixedWidthConfiguration conf = new FixedWidthConfiguration(10);
         FixedWidthDataContext dc = new FixedWidthDataContext(new File("src/test/resources/example_simple1.txt"), conf);
 
-        String[] schemaNames = dc.getSchemaNames().toArray(new String[0]);
+        String[] schemaNames = dc.getSchemaNames();
         assertEquals(2, schemaNames.length);
         assertEquals("[information_schema, resources]", Arrays.toString(schemaNames));
 
         Schema schema = dc.getDefaultSchema();
         assertEquals("Schema[name=resources]", schema.toString());
 
-        assertEquals(2, schema.getTableCount());
+        assertEquals(1, schema.getTableCount());
 
         Table table = schema.getTableByName("example_simple1.txt");
         assertEquals("Table[name=example_simple1.txt,type=TABLE,remarks=null]", table.toString());
 
-        assertEquals("[greeting, greeter]", Arrays.toString(table.getColumnNames().toArray()));
+        assertEquals("[greeting, greeter]", Arrays.toString(table.getColumnNames()));
         assertEquals(10, table.getColumnByName("greeting").getColumnSize().intValue());
         assertEquals(10, table.getColumnByName("greeter").getColumnSize().intValue());
 
@@ -99,19 +99,19 @@ public class FixedWidthDataContextTest extends TestCase {
                 10, true);
         FixedWidthDataContext dc = new FixedWidthDataContext(new File("src/test/resources/example_simple1.txt"), conf);
 
-        String[] schemaNames = dc.getSchemaNames().toArray(new String[0]);
+        String[] schemaNames = dc.getSchemaNames();
         assertEquals(2, schemaNames.length);
         assertEquals("[information_schema, resources]", Arrays.toString(schemaNames));
 
         Schema schema = dc.getDefaultSchema();
         assertEquals("Schema[name=resources]", schema.toString());
 
-        assertEquals(2, schema.getTableCount());
+        assertEquals(1, schema.getTableCount());
 
         Table table = schema.getTableByName("example_simple1.txt");
         assertEquals("Table[name=example_simple1.txt,type=TABLE,remarks=null]", table.toString());
 
-        assertEquals("[A, B]", Arrays.toString(table.getColumnNames().toArray()));
+        assertEquals("[A, B]", Arrays.toString(table.getColumnNames()));
 
         Query q = dc.query().from(table).select(table.getColumns()).toQuery();
         DataSet ds = dc.executeQuery(q);
@@ -137,8 +137,8 @@ public class FixedWidthDataContextTest extends TestCase {
     public void testVaryingValueLengthsCorrect() throws Exception {
         DataContext dc = new FixedWidthDataContext(new File("src/test/resources/example_simple2.txt"),
                 new FixedWidthConfiguration(new int[] { 1, 8, 7 }));
-        Table table = dc.getDefaultSchema().getTables().get(0);
-        assertEquals("[i, greeting, greeter]", Arrays.toString(table.getColumnNames().toArray()));
+        Table table = dc.getDefaultSchema().getTables()[0];
+        assertEquals("[i, greeting, greeter]", Arrays.toString(table.getColumnNames()));
 
         assertEquals(1, table.getColumnByName("i").getColumnSize().intValue());
         assertEquals(8, table.getColumnByName("greeting").getColumnSize().intValue());
@@ -174,8 +174,8 @@ public class FixedWidthDataContextTest extends TestCase {
                 new FixedWidthConfiguration(FixedWidthConfiguration.DEFAULT_COLUMN_NAME_LINE, "UTF8", new int[] { 1, 5,
                         7 }, false));
 
-        Table table = dc.getDefaultSchema().getTables().get(0);
-        assertEquals("[i, greet, inggree]", Arrays.toString(table.getColumnNames().toArray()));
+        Table table = dc.getDefaultSchema().getTables()[0];
+        assertEquals("[i, greet, inggree]", Arrays.toString(table.getColumnNames()));
 
         Query q = dc.query().from(table).select(table.getColumns()).toQuery();
         DataSet ds = dc.executeQuery(q);
@@ -208,8 +208,8 @@ public class FixedWidthDataContextTest extends TestCase {
                 new FixedWidthConfiguration(FixedWidthConfiguration.DEFAULT_COLUMN_NAME_LINE, "UTF8", new int[] { 1, 8,
                         9 }, false));
 
-        Table table = dc.getDefaultSchema().getTables().get(0);
-        assertEquals("[i, greeting, greeter]", Arrays.toString(table.getColumnNames().toArray()));
+        Table table = dc.getDefaultSchema().getTables()[0];
+        assertEquals("[i, greeting, greeter]", Arrays.toString(table.getColumnNames()));
 
         Query q = dc.query().from(table).select(table.getColumns()).toQuery();
         DataSet ds = dc.executeQuery(q);
