@@ -39,6 +39,7 @@ import org.apache.metamodel.BatchUpdateScript;
 import org.apache.metamodel.MetaModelException;
 import org.apache.metamodel.MetaModelHelper;
 import org.apache.metamodel.UpdateScript;
+import org.apache.metamodel.UpdateSummary;
 import org.apache.metamodel.UpdateableDataContext;
 import org.apache.metamodel.data.DataSet;
 import org.apache.metamodel.data.EmptyDataSet;
@@ -343,6 +344,7 @@ public class JdbcDataContext extends AbstractDataContext implements UpdateableDa
         return dataSet;
     }
 
+    @SuppressWarnings("resource")
     private DataSet execute(Connection connection, Query query, Statement statement, JdbcCompiledQuery compiledQuery,
             JdbcCompiledQueryLease lease, Object[] values) throws SQLException, MetaModelException {
         Integer maxRows = query.getMaxRows();
@@ -841,7 +843,7 @@ public class JdbcDataContext extends AbstractDataContext implements UpdateableDa
     }
 
     @Override
-    public void executeUpdate(final UpdateScript update) {
+    public UpdateSummary executeUpdate(final UpdateScript update) {
         final JdbcUpdateCallback updateCallback;
 
         if (_supportsBatchUpdates && update instanceof BatchUpdateScript) {
@@ -866,6 +868,8 @@ public class JdbcDataContext extends AbstractDataContext implements UpdateableDa
             updateCallback.close(false);
             throw e;
         }
+        
+        return updateCallback.getUpdateSummary();
     }
 
     protected boolean isSingleConnection() {
