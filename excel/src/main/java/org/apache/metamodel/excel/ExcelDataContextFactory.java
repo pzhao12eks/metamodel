@@ -16,39 +16,36 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.metamodel.csv;
+package org.apache.metamodel.excel;
 
+import org.apache.metamodel.ConnectionException;
 import org.apache.metamodel.DataContext;
 import org.apache.metamodel.factory.AbstractDataContextFactory;
 import org.apache.metamodel.factory.DataContextProperties;
 import org.apache.metamodel.factory.ResourceFactoryRegistry;
+import org.apache.metamodel.factory.UnsupportedDataContextPropertiesException;
 import org.apache.metamodel.schema.naming.ColumnNamingStrategy;
 import org.apache.metamodel.schema.naming.CustomColumnNamingStrategy;
-import org.apache.metamodel.util.FileHelper;
 import org.apache.metamodel.util.Resource;
 import org.apache.metamodel.util.SimpleTableDef;
 
-public class CsvDataContextFactory extends AbstractDataContextFactory {
+public class ExcelDataContextFactory extends AbstractDataContextFactory {
 
     @Override
     protected String getType() {
-        return "csv";
+        return "excel";
     }
 
     @Override
-    public DataContext create(DataContextProperties properties, ResourceFactoryRegistry resourceFactoryRegistry) {
-        assert accepts(properties, resourceFactoryRegistry);
+    public DataContext create(DataContextProperties properties, ResourceFactoryRegistry resourceFactoryRegistry)
+            throws UnsupportedDataContextPropertiesException, ConnectionException {
 
         final Resource resource = resourceFactoryRegistry.createResource(properties.getResourceProperties());
 
         final int columnNameLineNumber =
-                getInt(properties.getColumnNameLineNumber(), CsvConfiguration.DEFAULT_COLUMN_NAME_LINE);
-        final String encoding = getString(properties.getEncoding(), FileHelper.DEFAULT_ENCODING);
-        final char separatorChar = getChar(properties.getSeparatorChar(), CsvConfiguration.DEFAULT_SEPARATOR_CHAR);
-        final char quoteChar = getChar(properties.getQuoteChar(), CsvConfiguration.DEFAULT_QUOTE_CHAR);
-        final char escapeChar = getChar(properties.getEscapeChar(), CsvConfiguration.DEFAULT_ESCAPE_CHAR);
-        final boolean failOnInconsistentRowLength = getBoolean(properties.isFailOnInconsistentRowLength(), false);
-        final boolean multilineValuesEnabled = getBoolean(properties.isMultilineValuesEnabled(), true);
+                getInt(properties.getColumnNameLineNumber(), ExcelConfiguration.DEFAULT_COLUMN_NAME_LINE);
+        final Boolean skipEmptyLines = getBoolean(properties.isSkipEmptyLines(), true);
+        final Boolean skipEmptyColumns = getBoolean(properties.isSkipEmptyColumns(), false);
 
         final ColumnNamingStrategy columnNamingStrategy;
         if (properties.getTableDefs() == null) {
@@ -59,8 +56,8 @@ public class CsvDataContextFactory extends AbstractDataContextFactory {
             columnNamingStrategy = new CustomColumnNamingStrategy(columnNames);
         }
 
-        final CsvConfiguration configuration = new CsvConfiguration(columnNameLineNumber, columnNamingStrategy,
-                encoding, separatorChar, quoteChar, escapeChar, failOnInconsistentRowLength, multilineValuesEnabled);
-        return new CsvDataContext(resource, configuration);
+        final ExcelConfiguration configuration =
+                new ExcelConfiguration(columnNameLineNumber, columnNamingStrategy, skipEmptyLines, skipEmptyColumns);
+        return new ExcelDataContext(resource, configuration);
     }
 }

@@ -16,10 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.metamodel.pojo;
+package org.apache.metamodel.couchdb;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.net.MalformedURLException;
 
 import org.apache.metamodel.ConnectionException;
 import org.apache.metamodel.DataContext;
@@ -28,42 +27,50 @@ import org.apache.metamodel.factory.DataContextProperties;
 import org.apache.metamodel.factory.ResourceFactoryRegistry;
 import org.apache.metamodel.factory.UnsupportedDataContextPropertiesException;
 import org.apache.metamodel.util.SimpleTableDef;
+import org.ektorp.http.HttpClient;
+import org.ektorp.http.StdHttpClient;
+import org.ektorp.impl.StdCouchDbInstance;
 
-public class PojoDataContextFactory extends AbstractDataContextFactory {
+public class CouchDbDataContextFactory extends AbstractDataContextFactory {
 
     @Override
     protected String getType() {
-        return "pojo";
+        return "couchdb";
     }
 
     @Override
     public DataContext create(DataContextProperties properties, ResourceFactoryRegistry resourceFactoryRegistry)
             throws UnsupportedDataContextPropertiesException, ConnectionException {
+        final StdHttpClient.Builder httpClientBuilder = new StdHttpClient.Builder();
 
-        assert accepts(properties, resourceFactoryRegistry);
-
-        final String schemaName;
-        if (properties.getDatabaseName() != null) {
-            schemaName = properties.getDatabaseName();
-        } else {
-            schemaName = "Schema";
-        }
-
-        final List<TableDataProvider<?>> tableDataProviders;
-
-        final SimpleTableDef[] tableDefs = properties.getTableDefs();
-        if (tableDefs == null) {
-            tableDataProviders = new ArrayList<>();
-        } else {
-            tableDataProviders = new ArrayList<>(tableDefs.length);
-            for (int i = 0; i < tableDefs.length; i++) {
-                final TableDataProvider<?> tableDataProvider = new ArrayTableDataProvider(tableDefs[i],
-                        new ArrayList<Object[]>());
-                tableDataProviders.add(tableDataProvider);
+        final String url = properties.getUrl();
+        if (url != null && !url.isEmpty()) {
+            try {
+                httpClientBuilder.url(url);
+            } catch (MalformedURLException e) {
+                throw new IllegalArgumentException(url, e);
             }
+        } else {
+            httpClientBuilder.host(properties.getHostname());
+            httpClientBuilder.port(getInt(properties.getPort(), CouchDbDataContext.DEFAULT_PORT));
+            httpClientBuilder.enableSSL(getBoolean(properties.toMap().get("ssl"), false));
         }
 
-        return new PojoDataContext(schemaName, tableDataProviders);
+        httpClientBuilder.username(properties.getUsername());
+        httpClientBuilder.password(properties.getPassword());
+
+        final HttpClient httpClient = httpClientBuilder.build();
+        final SimpleTableDef[] tableDefs = properties.getTableDefs();
+        if (tableDefs != null && tableDefs.length > 0) {
+            return new CouchDbDataContext(httpClient, tableDefs);
+        }
+
+        final String databaseNames = properties.getDatabaseName();
+        if (databaseNames != null && !databaseNames.isEmpty()) {
+            return new CouchDbDataContext(new StdCouchDbInstance(httpClient), databaseNames.split(","));
+        }
+
+        return new CouchDbDataContext(httpClient);
     }
 
 }
