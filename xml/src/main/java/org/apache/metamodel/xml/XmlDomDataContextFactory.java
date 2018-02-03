@@ -16,54 +16,34 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.metamodel.pojo;
-
-import java.util.ArrayList;
-import java.util.List;
+package org.apache.metamodel.xml;
 
 import org.apache.metamodel.ConnectionException;
 import org.apache.metamodel.DataContext;
-import org.apache.metamodel.factory.AbstractDataContextFactory;
+import org.apache.metamodel.factory.DataContextFactory;
 import org.apache.metamodel.factory.DataContextProperties;
 import org.apache.metamodel.factory.ResourceFactoryRegistry;
 import org.apache.metamodel.factory.UnsupportedDataContextPropertiesException;
-import org.apache.metamodel.util.SimpleTableDef;
+import org.apache.metamodel.util.BooleanComparator;
+import org.apache.metamodel.util.Resource;
 
-public class PojoDataContextFactory extends AbstractDataContextFactory {
+public class XmlDomDataContextFactory implements DataContextFactory {
 
     @Override
-    protected String getType() {
-        return "pojo";
+    public boolean accepts(DataContextProperties properties, ResourceFactoryRegistry resourceFactoryRegistry) {
+        return "xml".equals(properties.getDataContextType()) && !properties.toMap().containsKey("table-defs");
     }
 
     @Override
     public DataContext create(DataContextProperties properties, ResourceFactoryRegistry resourceFactoryRegistry)
             throws UnsupportedDataContextPropertiesException, ConnectionException {
+        final Resource resource = resourceFactoryRegistry.createResource(properties.getResourceProperties());
 
-        assert accepts(properties, resourceFactoryRegistry);
-
-        final String schemaName;
-        if (properties.getDatabaseName() != null) {
-            schemaName = properties.getDatabaseName();
-        } else {
-            schemaName = "Schema";
+        boolean autoFlattenTables = true;
+        if (properties.toMap().get("auto-flatten-tables") != null) {
+            autoFlattenTables = BooleanComparator.toBoolean(properties.toMap().get("auto-flatten-tables"));
         }
 
-        final List<TableDataProvider<?>> tableDataProviders;
-
-        final SimpleTableDef[] tableDefs = properties.getTableDefs();
-        if (tableDefs == null) {
-            tableDataProviders = new ArrayList<>();
-        } else {
-            tableDataProviders = new ArrayList<>(tableDefs.length);
-            for (int i = 0; i < tableDefs.length; i++) {
-                final TableDataProvider<?> tableDataProvider = new ArrayTableDataProvider(tableDefs[i],
-                        new ArrayList<Object[]>());
-                tableDataProviders.add(tableDataProvider);
-            }
-        }
-
-        return new PojoDataContext(schemaName, tableDataProviders);
+        return new XmlDomDataContext(resource, autoFlattenTables);
     }
-
 }

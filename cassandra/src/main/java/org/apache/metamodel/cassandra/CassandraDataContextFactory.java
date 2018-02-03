@@ -16,10 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.metamodel.pojo;
+package org.apache.metamodel.cassandra;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.Map;
 
 import org.apache.metamodel.ConnectionException;
 import org.apache.metamodel.DataContext;
@@ -27,43 +26,47 @@ import org.apache.metamodel.factory.AbstractDataContextFactory;
 import org.apache.metamodel.factory.DataContextProperties;
 import org.apache.metamodel.factory.ResourceFactoryRegistry;
 import org.apache.metamodel.factory.UnsupportedDataContextPropertiesException;
-import org.apache.metamodel.util.SimpleTableDef;
 
-public class PojoDataContextFactory extends AbstractDataContextFactory {
+import com.datastax.driver.core.Cluster;
+import com.datastax.driver.core.Cluster.Builder;
+import com.google.common.base.Strings;
+
+public class CassandraDataContextFactory extends AbstractDataContextFactory {
 
     @Override
     protected String getType() {
-        return "pojo";
+        return "cassandra";
     }
 
     @Override
     public DataContext create(DataContextProperties properties, ResourceFactoryRegistry resourceFactoryRegistry)
             throws UnsupportedDataContextPropertiesException, ConnectionException {
 
-        assert accepts(properties, resourceFactoryRegistry);
+        final Map<String, Object> map = properties.toMap();
+        final Builder clusterBuilder = Cluster.builder();
 
-        final String schemaName;
-        if (properties.getDatabaseName() != null) {
-            schemaName = properties.getDatabaseName();
-        } else {
-            schemaName = "Schema";
+        final String hostname = properties.getHostname();
+        if (!Strings.isNullOrEmpty(hostname)) {
+            clusterBuilder.addContactPoints(hostname.split(","));
         }
 
-        final List<TableDataProvider<?>> tableDataProviders;
-
-        final SimpleTableDef[] tableDefs = properties.getTableDefs();
-        if (tableDefs == null) {
-            tableDataProviders = new ArrayList<>();
-        } else {
-            tableDataProviders = new ArrayList<>(tableDefs.length);
-            for (int i = 0; i < tableDefs.length; i++) {
-                final TableDataProvider<?> tableDataProvider = new ArrayTableDataProvider(tableDefs[i],
-                        new ArrayList<Object[]>());
-                tableDataProviders.add(tableDataProvider);
-            }
+        if (properties.getPort() != null) {
+            clusterBuilder.withPort(properties.getPort());
         }
 
-        return new PojoDataContext(schemaName, tableDataProviders);
+        if (map.containsKey("cluster-name")) {
+            clusterBuilder.withClusterName((String) map.get("cluster-name"));
+        }
+
+        if (properties.getUsername() != null && properties.getPassword() != null) {
+            clusterBuilder.withCredentials(properties.getUsername(), properties.getPassword());
+        }
+
+        final Cluster cluster = clusterBuilder.build();
+
+        final String keySpace = getString(map.get("keyspace"), properties.getDatabaseName());
+
+        return new CassandraDataContext(cluster, keySpace, properties.getTableDefs());
     }
 
 }

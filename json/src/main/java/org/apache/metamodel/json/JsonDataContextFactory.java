@@ -16,10 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.metamodel.pojo;
-
-import java.util.ArrayList;
-import java.util.List;
+package org.apache.metamodel.json;
 
 import org.apache.metamodel.ConnectionException;
 import org.apache.metamodel.DataContext;
@@ -27,43 +24,20 @@ import org.apache.metamodel.factory.AbstractDataContextFactory;
 import org.apache.metamodel.factory.DataContextProperties;
 import org.apache.metamodel.factory.ResourceFactoryRegistry;
 import org.apache.metamodel.factory.UnsupportedDataContextPropertiesException;
-import org.apache.metamodel.util.SimpleTableDef;
+import org.apache.metamodel.util.Resource;
 
-public class PojoDataContextFactory extends AbstractDataContextFactory {
+public class JsonDataContextFactory extends AbstractDataContextFactory {
 
     @Override
     protected String getType() {
-        return "pojo";
+        return "json";
     }
 
     @Override
     public DataContext create(DataContextProperties properties, ResourceFactoryRegistry resourceFactoryRegistry)
             throws UnsupportedDataContextPropertiesException, ConnectionException {
-
-        assert accepts(properties, resourceFactoryRegistry);
-
-        final String schemaName;
-        if (properties.getDatabaseName() != null) {
-            schemaName = properties.getDatabaseName();
-        } else {
-            schemaName = "Schema";
-        }
-
-        final List<TableDataProvider<?>> tableDataProviders;
-
-        final SimpleTableDef[] tableDefs = properties.getTableDefs();
-        if (tableDefs == null) {
-            tableDataProviders = new ArrayList<>();
-        } else {
-            tableDataProviders = new ArrayList<>(tableDefs.length);
-            for (int i = 0; i < tableDefs.length; i++) {
-                final TableDataProvider<?> tableDataProvider = new ArrayTableDataProvider(tableDefs[i],
-                        new ArrayList<Object[]>());
-                tableDataProviders.add(tableDataProvider);
-            }
-        }
-
-        return new PojoDataContext(schemaName, tableDataProviders);
+        final Resource resource = resourceFactoryRegistry.createResource(properties.getResourceProperties());
+        return new JsonDataContext(resource);
     }
 
 }
