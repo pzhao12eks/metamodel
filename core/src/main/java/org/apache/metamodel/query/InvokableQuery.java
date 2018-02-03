@@ -16,31 +16,28 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.metamodel.util;
+package org.apache.metamodel.query;
 
-import java.io.Serializable;
+import org.apache.metamodel.DataContext;
+import org.apache.metamodel.data.DataSet;
 
 /**
- * A predicate that is always false
- * 
- * @param <E>
+ * Represents a {@link Query} or query-builder object that's aware of it's {@link DataContext} and is ready to execute
+ * or compile.
  */
-public final class FalsePredicate<E> implements java.util.function.Predicate<E>, Serializable {
+public interface InvokableQuery {
 
-    private static final long serialVersionUID = 1L;
+    /**
+     * Compiles the query
+     * 
+     * @return the {@link CompiledQuery} that is is returned by compiling the query.
+     */
+    public CompiledQuery compile();
 
-    @Override
-    public boolean test(E arg) {
-        return false;
-    }
-
-    @Override
-    public int hashCode() {
-        return Boolean.FALSE.hashCode();
-    }
-
-    @Override
-    public boolean equals(Object obj) {
-        return obj != null && obj.getClass() == FalsePredicate.class;
-    }
+    /**
+     * Executes the query.
+     * 
+     * @return the {@link DataSet} that is returned by executing the query.
+     */
+    public DataSet execute();
 }

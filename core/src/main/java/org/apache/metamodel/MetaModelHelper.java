@@ -58,9 +58,7 @@ import org.apache.metamodel.schema.SuperColumnType;
 import org.apache.metamodel.schema.Table;
 import org.apache.metamodel.util.AggregateBuilder;
 import org.apache.metamodel.util.CollectionUtils;
-import org.apache.metamodel.util.Func;
 import org.apache.metamodel.util.ObjectComparator;
-import org.apache.metamodel.util.Predicate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -248,11 +246,8 @@ public final class MetaModelHelper {
     }
 
     public static DataSet getFiltered(DataSet dataSet, Iterable<FilterItem> filterItems) {
-        List<IRowFilter> filters = CollectionUtils.map(filterItems, new Func<FilterItem, IRowFilter>() {
-            @Override
-            public IRowFilter eval(FilterItem filterItem) {
-                return filterItem;
-            }
+        List<IRowFilter> filters = CollectionUtils.map(filterItems, filterItem -> {
+            return filterItem;
         });
         if (filters.isEmpty()) {
             return dataSet;
@@ -278,8 +273,8 @@ public final class MetaModelHelper {
 
         for (SelectItem selectItem : selectItems) {
             if (selectItem.getScalarFunction() != null) {
-                if (!dataSetSelectItems.contains(selectItem)
-                        && dataSetSelectItems.contains(selectItem.replaceFunction(null))) {
+                if (!dataSetSelectItems.contains(selectItem) && dataSetSelectItems.contains(selectItem.replaceFunction(
+                        null))) {
                     scalarFunctionSelectItemsToEvaluate.add(selectItem);
                 }
             }
@@ -314,8 +309,8 @@ public final class MetaModelHelper {
             }
             final DataSetHeader groupByHeader = new CachingDataSetHeader(groupBySelects);
 
-            // Creates a list of SelectItems that have functions
-            List<SelectItem> functionItems = getFunctionSelectItems(selectItems);
+            // Creates a list of SelectItems that have aggregate functions
+            List<SelectItem> functionItems = getAggregateFunctionSelectItems(selectItems);
 
             // Loop through the dataset and identify groups
             while (dataSet.next()) {
@@ -508,39 +503,15 @@ public final class MetaModelHelper {
         return new InMemoryDataSet(header, resultRows);
     }
 
-    /**
-     * 
-     * @param selectItems
-     * @return
-     * 
-     * @deprecated use {@link #getAggregateFunctionSelectItems(Iterable)} or
-     *             {@link #getScalarFunctionSelectItems(Iterable)} instead
-     */
-    @Deprecated
-    public static List<SelectItem> getFunctionSelectItems(Iterable<SelectItem> selectItems) {
-        return CollectionUtils.filter(selectItems, new Predicate<SelectItem>() {
-            @Override
-            public Boolean eval(SelectItem arg) {
-                return arg.getFunction() != null;
-            }
-        });
-    }
-
     public static List<SelectItem> getAggregateFunctionSelectItems(Iterable<SelectItem> selectItems) {
-        return CollectionUtils.filter(selectItems, new Predicate<SelectItem>() {
-            @Override
-            public Boolean eval(SelectItem arg) {
-                return arg.getAggregateFunction() != null;
-            }
+        return CollectionUtils.filter(selectItems, arg -> {
+            return arg.getAggregateFunction() != null;
         });
     }
 
     public static List<SelectItem> getScalarFunctionSelectItems(Iterable<SelectItem> selectItems) {
-        return CollectionUtils.filter(selectItems, new Predicate<SelectItem>() {
-            @Override
-            public Boolean eval(SelectItem arg) {
-                return arg.getScalarFunction() != null;
-            }
+        return CollectionUtils.filter(selectItems, arg -> {
+            return arg.getScalarFunction() != null;
         });
     }
 
@@ -716,10 +687,9 @@ public final class MetaModelHelper {
             List<Row> ds1rows = new ArrayList<Row>();
             ds1rows.add(ds1row);
 
-            DataSet carthesianProduct = getCarthesianProduct(
-                    new DataSet[] { new InMemoryDataSet(new CachingDataSetHeader(si1), ds1rows),
-                            new InMemoryDataSet(new CachingDataSetHeader(si2), ds2data) },
-                    onConditions);
+            DataSet carthesianProduct = getCarthesianProduct(new DataSet[] { new InMemoryDataSet(
+                    new CachingDataSetHeader(si1), ds1rows), new InMemoryDataSet(new CachingDataSetHeader(si2),
+                            ds2data) }, onConditions);
             List<Row> carthesianRows = readDataSetFull(carthesianProduct);
             if (carthesianRows.size() > 0) {
                 resultRows.addAll(carthesianRows);
@@ -787,20 +757,14 @@ public final class MetaModelHelper {
     }
 
     public static Column[] getColumnsByType(Column[] columns, final ColumnType columnType) {
-        return CollectionUtils.filter(columns, new Predicate<Column>() {
-            @Override
-            public Boolean eval(Column column) {
-                return column.getType() == columnType;
-            }
+        return CollectionUtils.filter(columns, column -> {
+            return column.getType() == columnType;
         }).toArray(new Column[0]);
     }
 
     public static Column[] getColumnsBySuperType(Column[] columns, final SuperColumnType superColumnType) {
-        return CollectionUtils.filter(columns, new Predicate<Column>() {
-            @Override
-            public Boolean eval(Column column) {
-                return column.getType().getSuperType() == superColumnType;
-            }
+        return CollectionUtils.filter(columns, column -> {
+            return column.getType().getSuperType() == superColumnType;
         }).toArray(new Column[0]);
     }
 

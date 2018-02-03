@@ -1,3 +1,10 @@
+### Apache MetaModel 5.0
+
+ * [METAMODEL-6] - Added update summary containing information about changes on returning UpdateableDataContext.executeUpdate(..)
+ * [METAMODEL-63] - Added UnionDataSet, a general purpose utility for doing client-side unions from other queries or data sets.
+ * [METAMODEL-222] - Added support for Java 8 lambdas, removed support for Java 7.
+ * [METAMODEL-1087] - Removed deprecated APIs from MetaModel's codebase.
+ * [METAMODEL-1139] - Employed Java 8 functional types (java.util.function) in favor of (now deprecated) Ref, Action, Func. 
  * [METAMODEL-1140] - Allowed SalesforceDataContext without a security token.
  * [METAMODEL-1141] - Added RFC 4180 compliant CSV parsing.
 

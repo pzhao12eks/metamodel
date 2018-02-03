@@ -215,6 +215,7 @@ final class SalesforceUpdateCallback extends AbstractUpdateCallback implements C
      * @param idList
      * @param whereItem
      */
+    @SuppressWarnings("deprecation")
     protected void buildIdList(List<String> idList, FilterItem whereItem) {
         if (whereItem.isCompoundFilter()) {
             final LogicalOperator logicalOperator = whereItem.getLogicalOperator();
@@ -244,7 +245,7 @@ final class SalesforceUpdateCallback extends AbstractUpdateCallback implements C
 
         final Object operand = whereItem.getOperand();
 
-        if (column == null || operand == null || selectItem.getFunction() != null) {
+        if (column == null || operand == null || selectItem.hasFunction()) {
             throw new IllegalStateException(
                     "Salesforce only allows deletion of records by their specific IDs. Violated by where item: "
                             + whereItem);
