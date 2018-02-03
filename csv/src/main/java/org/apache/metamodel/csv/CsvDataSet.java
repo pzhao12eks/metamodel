@@ -19,18 +19,15 @@
 package org.apache.metamodel.csv;
 
 import java.io.IOException;
-import java.util.List;
-import java.util.stream.Collectors;
 
 import org.apache.metamodel.MetaModelException;
 import org.apache.metamodel.data.AbstractDataSet;
 import org.apache.metamodel.data.DefaultRow;
 import org.apache.metamodel.data.Row;
-import org.apache.metamodel.query.SelectItem;
 import org.apache.metamodel.schema.Column;
 import org.apache.metamodel.util.FileHelper;
 
-import com.opencsv.CSVReader;
+import au.com.bytecode.opencsv.CSVReader;
 
 /**
  * Streaming DataSet implementation for CSV support
@@ -44,9 +41,9 @@ final class CsvDataSet extends AbstractDataSet {
     private volatile Integer _rowsRemaining;
     private volatile Row _row;
 
-    public CsvDataSet(CSVReader reader, List<Column> columns, Integer maxRows, int columnsInTable,
-                      boolean failOnInconsistentRowLength) {
-        super(columns.stream().map(SelectItem::new).collect(Collectors.toList()));
+    public CsvDataSet(CSVReader reader, Column[] columns, Integer maxRows, int columnsInTable,
+            boolean failOnInconsistentRowLength) {
+        super(columns);
         _reader = reader;
         _columnsInTable = columnsInTable;
         _failOnInconsistentRowLength = failOnInconsistentRowLength;

@@ -48,7 +48,9 @@ final class ExcelTableCreationBuilder extends AbstractTableCreationBuilder<Excel
         if (lineNumber != ExcelConfiguration.NO_COLUMN_NAME_LINE) {
             final int zeroBasedLineNumber = lineNumber - 1;
             final Row row = sheet.createRow(zeroBasedLineNumber);
-            for (final Column column : table.getColumns()) {
+            final Column[] columns = table.getColumns();
+            for (int i = 0; i < columns.length; i++) {
+                final Column column = columns[i];
                 final int columnNumber = column.getColumnNumber();
                 row.createCell(columnNumber).setCellValue(column.getName());
             }

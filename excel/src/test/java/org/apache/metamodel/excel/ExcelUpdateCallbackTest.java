@@ -84,11 +84,11 @@ public class ExcelUpdateCallbackTest extends TestCase {
 		{
 			ExcelDataContext dc = new ExcelDataContext(file);
 			assertEquals("[foobar]",
-					Arrays.toString(dc.getDefaultSchema().getTableNames().toArray()));
+					Arrays.toString(dc.getDefaultSchema().getTableNames()));
 
 			Table table = dc.getDefaultSchema().getTableByName("foobar");
 
-			assertEquals("[value0]", Arrays.toString(table.getColumnNames().toArray()));
+			assertEquals("[value0]", Arrays.toString(table.getColumnNames()));
 
 			DataSet ds = dc.query().from(table).select("value0").execute();
 			int recordNo = 1;

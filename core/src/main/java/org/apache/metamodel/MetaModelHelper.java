@@ -18,11 +18,16 @@
  */
 package org.apache.metamodel;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
-
 
 import org.apache.metamodel.data.CachingDataSetHeader;
 import org.apache.metamodel.data.DataSet;
@@ -53,7 +58,9 @@ import org.apache.metamodel.schema.SuperColumnType;
 import org.apache.metamodel.schema.Table;
 import org.apache.metamodel.util.AggregateBuilder;
 import org.apache.metamodel.util.CollectionUtils;
+import org.apache.metamodel.util.Func;
 import org.apache.metamodel.util.ObjectComparator;
+import org.apache.metamodel.util.Predicate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -172,102 +179,80 @@ public final class MetaModelHelper {
         return getCarthesianProduct(fromDataSets, new FilterItem[0]);
     }
 
-    public static DataSet getCarthesianProduct(DataSet[] fromDataSets, FilterItem... filterItems) {
-        return getCarthesianProduct(fromDataSets, Arrays.asList(filterItems));
-    }
-
     public static DataSet getCarthesianProduct(DataSet[] fromDataSets, Iterable<FilterItem> whereItems) {
-        assert (fromDataSets.length > 0);
         // First check if carthesian product is even nescesary
         if (fromDataSets.length == 1) {
             return getFiltered(fromDataSets[0], whereItems);
         }
-        // do a nested loop join, no matter what
-        Iterator<DataSet> dsIter = Arrays.asList(fromDataSets).iterator();
 
-
-        DataSet joined = dsIter.next();
-
-        while (dsIter.hasNext()) {
-            joined = nestedLoopJoin(dsIter.next(), joined, (whereItems));
-
+        List<SelectItem> selectItems = new ArrayList<SelectItem>();
+        for (DataSet dataSet : fromDataSets) {
+            for (int i = 0; i < dataSet.getSelectItems().length; i++) {
+                SelectItem item = dataSet.getSelectItems()[i];
+                selectItems.add(item);
+            }
         }
 
-        return joined;
-
-    }
-
-    /**
-     * Executes a simple nested loop join. The innerLoopDs will be copied in an
-     * in-memory dataset.
-     *
-     */
-    public static InMemoryDataSet nestedLoopJoin(DataSet innerLoopDs, DataSet outerLoopDs,
-            Iterable<FilterItem> filtersIterable) {
-
-        List<FilterItem> filters = new ArrayList<>();
-        for (FilterItem fi : filtersIterable) {
-            filters.add(fi);
-        }
-        List<Row> innerRows = innerLoopDs.toRows();
-
-        List<SelectItem> allItems = new ArrayList<>(outerLoopDs.getSelectItems());
-        allItems.addAll(innerLoopDs.getSelectItems());
-
-        Set<FilterItem> applicableFilters = applicableFilters(filters, allItems);
-
-        DataSetHeader jointHeader = new CachingDataSetHeader(allItems);
-
-        List<Row> resultRows = new ArrayList<>();
-        for (Row outerRow : outerLoopDs) {
-            for (Row innerRow : innerRows) {
-
-                Object[] joinedRowObjects = new Object[outerRow.getValues().length + innerRow.getValues().length];
-
-                System.arraycopy(outerRow.getValues(), 0, joinedRowObjects, 0, outerRow.getValues().length);
-                System.arraycopy(innerRow.getValues(), 0, joinedRowObjects, outerRow.getValues().length, innerRow
-                        .getValues().length);
-
-                Row joinedRow = new DefaultRow(jointHeader, joinedRowObjects);
-
-                if (applicableFilters.isEmpty() || applicableFilters.stream().allMatch(fi -> fi.accept(joinedRow))) {
-                    resultRows.add(joinedRow);
+        int selectItemOffset = 0;
+        List<Object[]> data = new ArrayList<Object[]>();
+        for (int fromDataSetIndex = 0; fromDataSetIndex < fromDataSets.length; fromDataSetIndex++) {
+            DataSet fromDataSet = fromDataSets[fromDataSetIndex];
+            SelectItem[] fromSelectItems = fromDataSet.getSelectItems();
+            if (fromDataSetIndex == 0) {
+                while (fromDataSet.next()) {
+                    Object[] values = fromDataSet.getRow().getValues();
+                    Object[] row = new Object[selectItems.size()];
+                    System.arraycopy(values, 0, row, selectItemOffset, values.length);
+                    data.add(row);
+                }
+                fromDataSet.close();
+            } else {
+                List<Object[]> fromDataRows = new ArrayList<Object[]>();
+                while (fromDataSet.next()) {
+                    fromDataRows.add(fromDataSet.getRow().getValues());
+                }
+                fromDataSet.close();
+                for (int i = 0; i < data.size(); i = i + fromDataRows.size()) {
+                    Object[] originalRow = data.get(i);
+                    data.remove(i);
+                    for (int j = 0; j < fromDataRows.size(); j++) {
+                        Object[] newRow = fromDataRows.get(j);
+                        System.arraycopy(newRow, 0, originalRow, selectItemOffset, newRow.length);
+                        data.add(i + j, originalRow.clone());
+                    }
                 }
             }
+            selectItemOffset += fromSelectItems.length;
         }
 
-        return new InMemoryDataSet(jointHeader, resultRows);
+        if (data.isEmpty()) {
+            return new EmptyDataSet(selectItems);
+        }
+
+        final DataSetHeader header = new CachingDataSetHeader(selectItems);
+        final List<Row> rows = new ArrayList<Row>(data.size());
+        for (Object[] objects : data) {
+            rows.add(new DefaultRow(header, objects, null));
+        }
+
+        DataSet result = new InMemoryDataSet(header, rows);
+        if (whereItems != null) {
+            DataSet filteredResult = getFiltered(result, whereItems);
+            result = filteredResult;
+        }
+        return result;
     }
 
-    /**
-     * Filters the FilterItems such that only the FilterItems are returned,
-     * which contain SelectItems that are contained in selectItemList
-     * 
-     * @param filters
-     * @param selectItemList
-     * @return
-     */
-    private static Set<FilterItem> applicableFilters(Collection<FilterItem> filters,
-            Collection<SelectItem> selectItemList) {
-
-        Set<SelectItem> items = new HashSet<SelectItem>(selectItemList);
-
-        return filters.stream().filter(fi -> {
-            Collection<SelectItem> fiSelectItems = new ArrayList<>();
-            fiSelectItems.add(fi.getSelectItem());
-            Object operand = fi.getOperand();
-            if (operand instanceof SelectItem) {
-                fiSelectItems.add((SelectItem) operand);
-            }
-
-            return items.containsAll(fiSelectItems);
-
-        }).collect(Collectors.toSet());
+    public static DataSet getCarthesianProduct(DataSet[] fromDataSets, FilterItem... filterItems) {
+        return getCarthesianProduct(fromDataSets, Arrays.asList(filterItems));
     }
 
     public static DataSet getFiltered(DataSet dataSet, Iterable<FilterItem> filterItems) {
-        List<IRowFilter> filters = CollectionUtils.map(filterItems, filterItem -> {
-            return filterItem;
+        List<IRowFilter> filters = CollectionUtils.map(filterItems, new Func<FilterItem, IRowFilter>() {
+            @Override
+            public IRowFilter eval(FilterItem filterItem) {
+                return filterItem;
+            }
         });
         if (filters.isEmpty()) {
             return dataSet;
@@ -281,7 +266,7 @@ public final class MetaModelHelper {
     }
 
     public static DataSet getSelection(final List<SelectItem> selectItems, final DataSet dataSet) {
-        final List<SelectItem> dataSetSelectItems = dataSet.getSelectItems();
+        final List<SelectItem> dataSetSelectItems = Arrays.asList(dataSet.getSelectItems());
 
         // check if the selection is already the same
         if (selectItems.equals(dataSetSelectItems)) {
@@ -293,8 +278,8 @@ public final class MetaModelHelper {
 
         for (SelectItem selectItem : selectItems) {
             if (selectItem.getScalarFunction() != null) {
-                if (!dataSetSelectItems.contains(selectItem) && dataSetSelectItems.contains(selectItem.replaceFunction(
-                        null))) {
+                if (!dataSetSelectItems.contains(selectItem)
+                        && dataSetSelectItems.contains(selectItem.replaceFunction(null))) {
                     scalarFunctionSelectItemsToEvaluate.add(selectItem);
                 }
             }
@@ -315,21 +300,22 @@ public final class MetaModelHelper {
 
     public static DataSet getGrouped(List<SelectItem> selectItems, DataSet dataSet,
             Collection<GroupByItem> groupByItems) {
-        return getGrouped(selectItems, dataSet, groupByItems);
+        return getGrouped(selectItems, dataSet, groupByItems.toArray(new GroupByItem[groupByItems.size()]));
     }
 
-    public static DataSet getGrouped(List<SelectItem> selectItems, DataSet dataSet, List<GroupByItem> groupByItems) {
+    public static DataSet getGrouped(List<SelectItem> selectItems, DataSet dataSet, GroupByItem[] groupByItems) {
         DataSet result = dataSet;
-        if (groupByItems != null && groupByItems.size() > 0) {
+        if (groupByItems != null && groupByItems.length > 0) {
             Map<Row, Map<SelectItem, List<Object>>> uniqueRows = new HashMap<Row, Map<SelectItem, List<Object>>>();
 
-            final List<SelectItem> groupBySelects = groupByItems.stream()
-                    .map(gbi -> gbi.getSelectItem())
-                    .collect(Collectors.toList());
+            final SelectItem[] groupBySelects = new SelectItem[groupByItems.length];
+            for (int i = 0; i < groupBySelects.length; i++) {
+                groupBySelects[i] = groupByItems[i].getSelectItem();
+            }
             final DataSetHeader groupByHeader = new CachingDataSetHeader(groupBySelects);
 
-            // Creates a list of SelectItems that have aggregate functions
-            List<SelectItem> functionItems = getAggregateFunctionSelectItems(selectItems);
+            // Creates a list of SelectItems that have functions
+            List<SelectItem> functionItems = getFunctionSelectItems(selectItems);
 
             // Loop through the dataset and identify groups
             while (dataSet.next()) {
@@ -522,15 +508,39 @@ public final class MetaModelHelper {
         return new InMemoryDataSet(header, resultRows);
     }
 
+    /**
+     * 
+     * @param selectItems
+     * @return
+     * 
+     * @deprecated use {@link #getAggregateFunctionSelectItems(Iterable)} or
+     *             {@link #getScalarFunctionSelectItems(Iterable)} instead
+     */
+    @Deprecated
+    public static List<SelectItem> getFunctionSelectItems(Iterable<SelectItem> selectItems) {
+        return CollectionUtils.filter(selectItems, new Predicate<SelectItem>() {
+            @Override
+            public Boolean eval(SelectItem arg) {
+                return arg.getFunction() != null;
+            }
+        });
+    }
+
     public static List<SelectItem> getAggregateFunctionSelectItems(Iterable<SelectItem> selectItems) {
-        return CollectionUtils.filter(selectItems, arg -> {
-            return arg.getAggregateFunction() != null;
+        return CollectionUtils.filter(selectItems, new Predicate<SelectItem>() {
+            @Override
+            public Boolean eval(SelectItem arg) {
+                return arg.getAggregateFunction() != null;
+            }
         });
     }
 
     public static List<SelectItem> getScalarFunctionSelectItems(Iterable<SelectItem> selectItems) {
-        return CollectionUtils.filter(selectItems, arg -> {
-            return arg.getScalarFunction() != null;
+        return CollectionUtils.filter(selectItems, new Predicate<SelectItem>() {
+            @Override
+            public Boolean eval(SelectItem arg) {
+                return arg.getScalarFunction() != null;
+            }
         });
     }
 
@@ -682,9 +692,12 @@ public final class MetaModelHelper {
         if (ds2 == null) {
             throw new IllegalArgumentException("Right DataSet cannot be null");
         }
-        List<SelectItem> si1 = ds1.getSelectItems();
-        List<SelectItem> si2 = ds2.getSelectItems();
-        List<SelectItem> selectItems = Stream.concat(si1.stream(),si2.stream()).collect(Collectors.toList());
+        SelectItem[] si1 = ds1.getSelectItems();
+        SelectItem[] si2 = ds2.getSelectItems();
+        SelectItem[] selectItems = new SelectItem[si1.length + si2.length];
+        System.arraycopy(si1, 0, selectItems, 0, si1.length);
+        System.arraycopy(si2, 0, selectItems, si1.length, si2.length);
+
         List<Row> resultRows = new ArrayList<Row>();
         List<Row> ds2data = readDataSetFull(ds2);
         if (ds2data.isEmpty()) {
@@ -703,15 +716,16 @@ public final class MetaModelHelper {
             List<Row> ds1rows = new ArrayList<Row>();
             ds1rows.add(ds1row);
 
-            DataSet carthesianProduct = getCarthesianProduct(new DataSet[] { new InMemoryDataSet(
-                    new CachingDataSetHeader(si1), ds1rows), new InMemoryDataSet(new CachingDataSetHeader(si2),
-                            ds2data) }, onConditions);
+            DataSet carthesianProduct = getCarthesianProduct(
+                    new DataSet[] { new InMemoryDataSet(new CachingDataSetHeader(si1), ds1rows),
+                            new InMemoryDataSet(new CachingDataSetHeader(si2), ds2data) },
+                    onConditions);
             List<Row> carthesianRows = readDataSetFull(carthesianProduct);
             if (carthesianRows.size() > 0) {
                 resultRows.addAll(carthesianRows);
             } else {
                 Object[] values = ds1row.getValues();
-                Object[] row = new Object[selectItems.size()];
+                Object[] row = new Object[selectItems.length];
                 System.arraycopy(values, 0, row, 0, values.length);
                 resultRows.add(new DefaultRow(header, row));
             }
@@ -737,11 +751,11 @@ public final class MetaModelHelper {
      * @return the right joined result dataset
      */
     public static DataSet getRightJoin(DataSet ds1, DataSet ds2, FilterItem[] onConditions) {
-        List<SelectItem> ds1selects = ds1.getSelectItems();
-        List<SelectItem> ds2selects = ds2.getSelectItems();
-        List<SelectItem> leftOrderedSelects = new ArrayList<>();
-        leftOrderedSelects.addAll(ds1selects);
-        leftOrderedSelects.addAll(ds2selects);
+        SelectItem[] ds1selects = ds1.getSelectItems();
+        SelectItem[] ds2selects = ds2.getSelectItems();
+        SelectItem[] leftOrderedSelects = new SelectItem[ds1selects.length + ds2selects.length];
+        System.arraycopy(ds1selects, 0, leftOrderedSelects, 0, ds1selects.length);
+        System.arraycopy(ds2selects, 0, leftOrderedSelects, ds1selects.length, ds2selects.length);
 
         // We will reuse the left join algorithm (but switch the datasets
         // around)
@@ -760,12 +774,12 @@ public final class MetaModelHelper {
     }
 
     public static DataSet getDistinct(DataSet dataSet) {
-        List<SelectItem> selectItems = dataSet.getSelectItems();
-        List<GroupByItem> groupByItems = selectItems.stream()
-                .map(GroupByItem::new)
-                .collect(Collectors.toList());
-
-        return getGrouped(selectItems, dataSet, groupByItems);
+        SelectItem[] selectItems = dataSet.getSelectItems();
+        GroupByItem[] groupByItems = new GroupByItem[selectItems.length];
+        for (int i = 0; i < groupByItems.length; i++) {
+            groupByItems[i] = new GroupByItem(selectItems[i]);
+        }
+        return getGrouped(Arrays.asList(selectItems), dataSet, groupByItems);
     }
 
     public static Table[] getTables(Column[] columns) {
@@ -773,14 +787,20 @@ public final class MetaModelHelper {
     }
 
     public static Column[] getColumnsByType(Column[] columns, final ColumnType columnType) {
-        return CollectionUtils.filter(columns, column -> {
-            return column.getType() == columnType;
+        return CollectionUtils.filter(columns, new Predicate<Column>() {
+            @Override
+            public Boolean eval(Column column) {
+                return column.getType() == columnType;
+            }
         }).toArray(new Column[0]);
     }
 
     public static Column[] getColumnsBySuperType(Column[] columns, final SuperColumnType superColumnType) {
-        return CollectionUtils.filter(columns, column -> {
-            return column.getType().getSuperType() == superColumnType;
+        return CollectionUtils.filter(columns, new Predicate<Column>() {
+            @Override
+            public Boolean eval(Column column) {
+                return column.getType().getSuperType() == superColumnType;
+            }
         }).toArray(new Column[0]);
     }
 

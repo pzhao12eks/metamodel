@@ -44,11 +44,11 @@ public class XmlSaxDataContextTest extends TestCase {
 
 		final Schema schema = dc.getDefaultSchema();
 		assertEquals("Schema[name=/dependencies]", schema.toString());
-		assertEquals("[/dependency]", Arrays.toString(schema.getTableNames().toArray()));
+		assertEquals("[/dependency]", Arrays.toString(schema.getTableNames()));
 
 		final Table table = schema.getTableByName("/dependency");
 		assertEquals("[row_id, /artifactId, /groupId, /version, /scope]",
-				Arrays.toString(table.getColumnNames().toArray()));
+				Arrays.toString(table.getColumnNames()));
 
 		// perform a regular query
 		DataSet ds = dc.query().from(table).select(table.getColumns())
@@ -112,13 +112,13 @@ public class XmlSaxDataContextTest extends TestCase {
 		final Schema schema = dc.getDefaultSchema();
 		assertEquals("Schema[name=/root]", schema.toString());
 		assertEquals("[/employee, /organization]",
-				Arrays.toString(schema.getTableNames().toArray()));
+				Arrays.toString(schema.getTableNames()));
 
 		// organization assertions
 		final Table organizationTable = schema.getTableByName("/organization");
 		{
 			assertEquals("[row_id, /name, @type]",
-					Arrays.toString(organizationTable.getColumnNames().toArray()));
+					Arrays.toString(organizationTable.getColumnNames()));
 
 			DataSet ds = dc.query().from(organizationTable)
 					.select(organizationTable.getColumns()).execute();
@@ -140,7 +140,7 @@ public class XmlSaxDataContextTest extends TestCase {
 		{
 			assertEquals(
 					"[row_id, /name, /gender, index(/root/organization/employees), index(/root/organization)]",
-					Arrays.toString(employeeTable.getColumnNames().toArray()));
+					Arrays.toString(employeeTable.getColumnNames()));
 
 			DataSet ds = dc.query().from(employeeTable)
 					.select(employeeTable.getColumns()).execute();

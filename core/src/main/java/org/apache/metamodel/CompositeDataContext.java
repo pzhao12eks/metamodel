@@ -19,6 +19,7 @@
 package org.apache.metamodel;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -26,8 +27,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.TreeSet;
-import java.util.function.Function;
 
 import org.apache.metamodel.data.DataSet;
 import org.apache.metamodel.query.FromItem;
@@ -35,9 +34,9 @@ import org.apache.metamodel.query.Query;
 import org.apache.metamodel.schema.CompositeSchema;
 import org.apache.metamodel.schema.Schema;
 import org.apache.metamodel.schema.Table;
+import org.apache.metamodel.util.Func;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 
 /**
  * DataContext for composite datacontexts. Composite DataContexts wrap several
@@ -93,7 +92,12 @@ public class CompositeDataContext extends AbstractDataContext {
         } else {
             // we create a datacontext which can materialize tables from
             // separate datacontexts.
-            final Function<Table, DataContext> dataContextRetrievalFunction = table -> getDataContext(table);
+            final Func<Table, DataContext> dataContextRetrievalFunction = new Func<Table, DataContext>() {
+                @Override
+                public DataContext eval(Table table) {
+                    return getDataContext(table);
+                }
+            };
             return new CompositeQueryDelegate(dataContextRetrievalFunction).executeQuery(query);
         }
     }
@@ -178,10 +182,10 @@ public class CompositeDataContext extends AbstractDataContext {
     }
 
     @Override
-    public List<String> getSchemaNamesInternal() throws MetaModelException {
-        Set<String> set = new TreeSet<>();
+    public String[] getSchemaNamesInternal() throws MetaModelException {
+        Set<String> set = new HashSet<String>();
         for (DataContext dc : _delegates) {
-            List<String> schemaNames = dc.getSchemaNames();
+            String[] schemaNames = dc.getSchemaNames();
             for (String name : schemaNames) {
                 if (!MetaModelHelper.isInformationSchema(name)) {
                     // we skip information schemas, since they're anyways going
@@ -190,7 +194,9 @@ public class CompositeDataContext extends AbstractDataContext {
                 }
             }
         }
-        return new ArrayList<>(set);
+        String[] result = set.toArray(new String[set.size()]);
+        Arrays.sort(result);
+        return result;
     }
 
 }

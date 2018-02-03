@@ -51,7 +51,7 @@ public class XmlDomDataContextTest extends TestCase {
         try {
             XmlDomDataContext dataContext = new XmlDomDataContext(url, false);
             assertEquals("xml_input_eobjects.xml", dataContext.getDefaultSchema().getName());
-            assertEquals(2, dataContext.getSchemaNames().size());
+            assertEquals(2, dataContext.getSchemaNames().length);
             Schema schema = dataContext.getSchemaByName("xml_input_eobjects.xml");
             assertEquals("Schema[name=xml_input_eobjects.xml]", schema.toString());
             assertEquals(5, schema.getTableCount());
@@ -68,30 +68,31 @@ public class XmlDomDataContextTest extends TestCase {
         XmlDomDataContext dataContext = new XmlDomDataContext(file, false);
 
         assertEquals("xml_input_eobjects.xml", dataContext.getDefaultSchema().getName());
-        assertEquals(2, dataContext.getSchemaNames().size());
+        assertEquals(2, dataContext.getSchemaNames().length);
 
         Schema schema = dataContext.getSchemaByName("xml_input_eobjects.xml");
         assertEquals("Schema[name=xml_input_eobjects.xml]", schema.toString());
 
+        Table[] tables = schema.getTables();
         assertEquals(5, schema.getTableCount());
         assertEquals("[Table[name=eobjects.dk,type=TABLE,remarks=null], "
                 + "Table[name=contributors_person,type=TABLE,remarks=null], "
                 + "Table[name=contributors_person_name,type=TABLE,remarks=null], "
                 + "Table[name=contributors_person_address,type=TABLE,remarks=null], "
-                + "Table[name=projects_project,type=TABLE,remarks=null]]", Arrays.toString(schema.getTables().toArray()));
+                + "Table[name=projects_project,type=TABLE,remarks=null]]", Arrays.toString(tables));
 
         Table table = schema.getTableByName("eobjects.dk");
         assertEquals(2, table.getColumnCount());
         assertEquals(
                 "[Column[name=id,columnNumber=0,type=INTEGER,nullable=false,nativeType=Auto-generated primary key,columnSize=null], "
                         + "Column[name=website,columnNumber=2,type=STRING,nullable=true,nativeType=XML Attribute,columnSize=null]]",
-                Arrays.toString(table.getColumns().toArray()));
+                Arrays.toString(table.getColumns()));
 
         table = schema.getTableByName("contributors_person");
         assertEquals(1, table.getColumnCount());
         assertEquals(
                 "[Column[name=id,columnNumber=0,type=INTEGER,nullable=false,nativeType=Auto-generated primary key,columnSize=null]]",
-                Arrays.toString(table.getColumns().toArray()));
+                Arrays.toString(table.getColumns()));
 
         table = schema.getTableByName("contributors_person_name");
         assertEquals(3, table.getColumnCount());
@@ -99,10 +100,10 @@ public class XmlDomDataContextTest extends TestCase {
                 "[Column[name=id,columnNumber=0,type=INTEGER,nullable=false,nativeType=Auto-generated primary key,columnSize=null], "
                         + "Column[name=contributors_person_id,columnNumber=1,type=INTEGER,nullable=false,nativeType=Auto-generated foreign key,columnSize=null], "
                         + "Column[name=name,columnNumber=2,type=STRING,nullable=true,nativeType=XML Text,columnSize=null]]",
-                Arrays.toString(table.getColumns().toArray()));
+                Arrays.toString(table.getColumns()));
         assertEquals("[Relationship[primaryTable=contributors_person,primaryColumns=[id],"
                 + "foreignTable=contributors_person_name,foreignColumns=[contributors_person_id]]]",
-                Arrays.toString(table.getRelationships().toArray()));
+                Arrays.toString(table.getRelationships()));
 
         table = schema.getTableByName("contributors_person_address");
         assertEquals(3, table.getColumnCount());
@@ -110,10 +111,10 @@ public class XmlDomDataContextTest extends TestCase {
                 "[Column[name=id,columnNumber=0,type=INTEGER,nullable=false,nativeType=Auto-generated primary key,columnSize=null], "
                         + "Column[name=contributors_person_id,columnNumber=1,type=INTEGER,nullable=false,nativeType=Auto-generated foreign key,columnSize=null], "
                         + "Column[name=address,columnNumber=2,type=STRING,nullable=true,nativeType=XML Text,columnSize=null]]",
-                Arrays.toString(table.getColumns().toArray()));
+                Arrays.toString(table.getColumns()));
         assertEquals("[Relationship[primaryTable=contributors_person,primaryColumns=[id],"
                 + "foreignTable=contributors_person_address,foreignColumns=[contributors_person_id]]]",
-                Arrays.toString(table.getRelationships().toArray()));
+                Arrays.toString(table.getRelationships()));
 
         table = schema.getTableByName("projects_project");
         assertEquals(3, table.getColumnCount());
@@ -121,7 +122,7 @@ public class XmlDomDataContextTest extends TestCase {
                 "[Column[name=id,columnNumber=0,type=INTEGER,nullable=false,nativeType=Auto-generated primary key,columnSize=null], "
                         + "Column[name=project,columnNumber=1,type=STRING,nullable=true,nativeType=XML Text,columnSize=null], "
                         + "Column[name=name,columnNumber=2,type=STRING,nullable=true,nativeType=XML Attribute,columnSize=null]]",
-                Arrays.toString(table.getColumns().toArray()));
+                Arrays.toString(table.getColumns()));
 
         dataContext.autoFlattenTables();
         table = schema.getTableByName("contributors_person");
@@ -129,7 +130,7 @@ public class XmlDomDataContextTest extends TestCase {
         assertEquals(
                 "[Column[name=id,columnNumber=0,type=INTEGER,nullable=false,nativeType=Auto-generated primary key,columnSize=null], "
                         + "Column[name=name,columnNumber=1,type=STRING,nullable=true,nativeType=XML Text,columnSize=null]]",
-                Arrays.toString(table.getColumns().toArray()));
+                Arrays.toString(table.getColumns()));
     }
 
     public void testExecuteQuery() throws Exception {
@@ -158,7 +159,7 @@ public class XmlDomDataContextTest extends TestCase {
 
         // Make a new query that joins the normalized tables together
         table = schema.getTableByName("contributors_person_address");
-        Relationship relationShip = table.getRelationships().iterator().next();
+        Relationship relationShip = table.getRelationships()[0];
         q = new Query().select(relationShip.getPrimaryTable().getColumns())
                 .select(relationShip.getForeignTable().getColumns()).from(new FromItem(JoinType.INNER, relationShip));
 
@@ -210,12 +211,12 @@ public class XmlDomDataContextTest extends TestCase {
         XmlDomDataContext strategy = new XmlDomDataContext("foobarSchema", document, true);
         Schema schema = strategy.getSchemaByName("foobarSchema");
         assertEquals("Schema[name=foobarSchema]", schema.toString());
-        assertEquals("[Table[name=child,type=TABLE,remarks=null]]", Arrays.toString(schema.getTables().toArray()));
-        Table table = schema.getTable(0);
+        assertEquals("[Table[name=child,type=TABLE,remarks=null]]", Arrays.toString(schema.getTables()));
+        Table table = schema.getTables()[0];
         assertEquals(
                 "[Column[name=id,columnNumber=0,type=INTEGER,nullable=false,nativeType=Auto-generated primary key,columnSize=null], "
                         + "Column[name=child,columnNumber=1,type=STRING,nullable=true,nativeType=XML Text,columnSize=null]]",
-                Arrays.toString(table.getColumns().toArray()));
+                Arrays.toString(table.getColumns()));
     }
 
     public void testFlattenTables() throws Exception {
@@ -226,18 +227,18 @@ public class XmlDomDataContextTest extends TestCase {
                 + "Table[name=dependency_groupId,type=TABLE,remarks=null], "
                 + "Table[name=dependency_artifactId,type=TABLE,remarks=null], "
                 + "Table[name=dependency_version,type=TABLE,remarks=null], "
-                + "Table[name=dependency_scope,type=TABLE,remarks=null]]", Arrays.toString(schema.getTables().toArray()));
+                + "Table[name=dependency_scope,type=TABLE,remarks=null]]", Arrays.toString(schema.getTables()));
         Table dependencyTable = schema.getTableByName("dependency");
         assertEquals(
                 "[Column[name=id,columnNumber=0,type=INTEGER,nullable=false,nativeType=Auto-generated primary key,columnSize=null]]",
-                Arrays.toString(dependencyTable.getColumns().toArray()));
+                Arrays.toString(dependencyTable.getColumns()));
         List<Object[]> dependencyData = dc
                 .materializeMainSchemaTable(dependencyTable, dependencyTable.getColumns(), -1).toObjectArrays();
         assertEquals(11, dependencyData.size());
         assertEquals("[1]", Arrays.toString(dependencyData.get(0)));
         assertEquals("[11]", Arrays.toString(dependencyData.get(10)));
 
-        Relationship relationship = schema.getTableByName("dependency_groupId").getRelationships().iterator().next();
+        Relationship relationship = schema.getTableByName("dependency_groupId").getRelationships()[0];
         assertEquals(
                 "Relationship[primaryTable=dependency,primaryColumns=[id],foreignTable=dependency_groupId,foreignColumns=[dependency_id]]",
                 relationship.toString());
@@ -247,12 +248,12 @@ public class XmlDomDataContextTest extends TestCase {
         assertEquals("[Table[name=dependency,type=TABLE,remarks=null], "
                 + "Table[name=dependency_artifactId,type=TABLE,remarks=null], "
                 + "Table[name=dependency_version,type=TABLE,remarks=null], "
-                + "Table[name=dependency_scope,type=TABLE,remarks=null]]", Arrays.toString(schema.getTables().toArray()));
+                + "Table[name=dependency_scope,type=TABLE,remarks=null]]", Arrays.toString(schema.getTables()));
 
         assertEquals(
                 "[Column[name=id,columnNumber=0,type=INTEGER,nullable=false,nativeType=Auto-generated primary key,columnSize=null], "
                         + "Column[name=groupId,columnNumber=1,type=STRING,nullable=true,nativeType=XML Text,columnSize=null]]",
-                Arrays.toString(dependencyTable.getColumns().toArray()));
+                Arrays.toString(dependencyTable.getColumns()));
 
         dependencyData = dc.materializeMainSchemaTable(dependencyTable, dependencyTable.getColumns(), -1)
                 .toObjectArrays();
@@ -262,14 +263,14 @@ public class XmlDomDataContextTest extends TestCase {
 
         dc.autoFlattenTables();
 
-        assertEquals("[Table[name=dependency,type=TABLE,remarks=null]]", Arrays.toString(schema.getTables().toArray()));
+        assertEquals("[Table[name=dependency,type=TABLE,remarks=null]]", Arrays.toString(schema.getTables()));
         assertEquals(
                 "[Column[name=id,columnNumber=0,type=INTEGER,nullable=false,nativeType=Auto-generated primary key,columnSize=null], "
                         + "Column[name=groupId,columnNumber=1,type=STRING,nullable=true,nativeType=XML Text,columnSize=null], "
                         + "Column[name=artifactId,columnNumber=2,type=STRING,nullable=true,nativeType=XML Text,columnSize=null], "
                         + "Column[name=version,columnNumber=3,type=STRING,nullable=true,nativeType=XML Text,columnSize=null], "
                         + "Column[name=scope,columnNumber=4,type=STRING,nullable=true,nativeType=XML Text,columnSize=null]]",
-                Arrays.toString(dependencyTable.getColumns().toArray()));
+                Arrays.toString(dependencyTable.getColumns()));
 
         dependencyData = dc.materializeMainSchemaTable(dependencyTable, dependencyTable.getColumns(), -1)
                 .toObjectArrays();
@@ -289,13 +290,13 @@ public class XmlDomDataContextTest extends TestCase {
                         + "Column[name=artifactId,columnNumber=2,type=STRING,nullable=true,nativeType=XML Text,columnSize=null], "
                         + "Column[name=version,columnNumber=3,type=STRING,nullable=true,nativeType=XML Text,columnSize=null], "
                         + "Column[name=scope,columnNumber=4,type=STRING,nullable=true,nativeType=XML Text,columnSize=null]]",
-                Arrays.toString(table.getColumns().toArray()));
+                Arrays.toString(table.getColumns()));
 
         table = schema.getTableByName("inceptionYear");
         assertEquals(
                 "[Column[name=id,columnNumber=0,type=INTEGER,nullable=false,nativeType=Auto-generated primary key,columnSize=null], "
                         + "Column[name=inceptionYear,columnNumber=1,type=STRING,nullable=true,nativeType=XML Text,columnSize=null]]",
-                Arrays.toString(table.getColumns().toArray()));
+                Arrays.toString(table.getColumns()));
 
         // first read
         DataSet data = dc.executeQuery(new Query().select(table.getColumnByName("inceptionYear")).from(table)
@@ -322,10 +323,10 @@ public class XmlDomDataContextTest extends TestCase {
                 + "Machine_Hardware_Network_Adapter, Machine_Hardware_UART_Port, Machine_Hardware_LPT_Port, "
                 + "Machine_Hardware_AudioAdapter, Machine_Hardware_SharedFolders_SharedFolder, "
                 + "Machine_Hardware_Guest, Machine_HardDiskAttachments_HardDiskAttachment]",
-                Arrays.toString(schema.getTableNames().toArray()));
+                Arrays.toString(schema.getTableNames()));
         assertEquals(
                 "[id, OSType, lastStateChange, name, uuid, enabled, enabled, RAMSize, enabled, enabled, mode, value, "
                         + "enabled, type, enabled, mode]",
-                Arrays.toString(schema.getTableByName("Machine").getColumnNames().toArray()));
+                Arrays.toString(schema.getTableByName("Machine").getColumnNames()));
     }
 }

@@ -19,13 +19,12 @@
 package org.apache.metamodel.salesforce;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
-import java.util.function.Supplier;
 
 import org.apache.metamodel.schema.AbstractSchema;
 import org.apache.metamodel.schema.Table;
 import org.apache.metamodel.util.LazyRef;
+import org.apache.metamodel.util.Ref;
 
 import com.sforce.soap.partner.DescribeGlobalResult;
 import com.sforce.soap.partner.DescribeGlobalSObjectResult;
@@ -41,7 +40,7 @@ final class SalesforceSchema extends AbstractSchema {
     private static final long serialVersionUID = 1L;
 
     private final String _name;
-    private final transient Supplier<List<Table>> _tableRef;
+    private final transient Ref<List<Table>> _tableRef;
     private final transient PartnerConnection _connection;
 
     public SalesforceSchema(String name, PartnerConnection connection) {
@@ -79,8 +78,9 @@ final class SalesforceSchema extends AbstractSchema {
     }
 
     @Override
-    public List<Table> getTables() {
-        return Collections.unmodifiableList(_tableRef.get());
+    public Table[] getTables() {
+        List<Table> tables = _tableRef.get();
+        return tables.toArray(new Table[tables.size()]);
     }
 
     @Override

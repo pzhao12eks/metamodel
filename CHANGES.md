@@ -1,20 +1,3 @@
-### Apache MetaModel 5.0
-
- * [METAMODEL-1161] - Fixed issue with maxRows being ignored on Oracle 
- * [METAMODEL-6] - Added update summary containing information about changes on returning UpdateableDataContext.executeUpdate(..)
- * [METAMODEL-7] - Applied collections, lists etc. instead of arrays in the MetaModel API.
- * [METAMODEL-63] - Added UnionDataSet, a general purpose utility for doing client-side unions from other queries or data sets.
- * [METAMODEL-222] - Added support for Java 8 lambdas, removed support for Java 7.
- * [METAMODEL-1087] - Removed deprecated APIs from MetaModel's codebase.
- * [METAMODEL-1139] - Employed Java 8 functional types (java.util.function) in favor of (now deprecated) Ref, Action, Func. 
- * [METAMODEL-1140] - Allowed SalesforceDataContext without a security token.
- * [METAMODEL-1141] - Added RFC 4180 compliant CSV parsing.
- * [METAMODEL-1144] - Optimized evaluation of conditional client-side JOIN statements.
- * [METAMODEL-1145] - Fixed bug with modelling JDBC table relationships when there are multiple keys involved in the relationship.
- * [METAMODEL-1151] - Added DataContextFactory classes for instantiating DataContexts of many types based on properties.
- * [METAMODEL-1160] - Fixed bug when deserializing v4.x CsvTable objects
- * [METAMODEL-1163] - Fixed bug when deserializing v4.x MutableRelationship and ImmutableRelationship objects
-
 ### Apache MetaModel 4.6.0
 
  * [METAMODEL-1136] - New connector for Amazon DynamoDB.

@@ -274,7 +274,9 @@ public final class QuerySplitter {
     }
 
     private static void addColumnsToResult(Table table, List<Column> result) {
-        for (Column column: table.getNumberColumns()) {
+        Column[] numberColumns = table.getNumberColumns();
+        for (int i = 0; i < numberColumns.length; i++) {
+            Column column = numberColumns[i];
             if (column.isIndexed()) {
                 // Indexed columns have first priority, they will be
                 // added to the beginning of the list

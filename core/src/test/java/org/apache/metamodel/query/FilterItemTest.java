@@ -18,7 +18,6 @@
  */
 package org.apache.metamodel.query;
 
-import com.google.common.collect.Lists;
 import junit.framework.TestCase;
 
 import org.apache.metamodel.DataContext;
@@ -44,7 +43,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.stream.Collectors;
 
 public class FilterItemTest extends TestCase {
 
@@ -170,7 +168,7 @@ public class FilterItemTest extends TestCase {
         Column col2 = new MutableColumn("Col2", ColumnType.DECIMAL);
         SelectItem s1 = new SelectItem(col1);
         SelectItem s2 = new SelectItem(col2);
-        List<SelectItem> selectItems = Lists.newArrayList( s1, s2 );
+        SelectItem[] selectItems = new SelectItem[] { s1, s2 };
         CachingDataSetHeader header = new CachingDataSetHeader(selectItems);
 
         FilterItem c = new FilterItem(s1, OperatorType.EQUALS_TO, null);
@@ -237,7 +235,8 @@ public class FilterItemTest extends TestCase {
     public void testEvaluateDates() throws Exception {
         Column col1 = new MutableColumn("Col1", ColumnType.DATE);
         SelectItem s1 = new SelectItem(col1);
-        CachingDataSetHeader header = new CachingDataSetHeader(Lists.newArrayList(s1));
+        SelectItem[] selectItems = new SelectItem[] { s1 };
+        CachingDataSetHeader header = new CachingDataSetHeader(selectItems);
 
         long currentTimeMillis = System.currentTimeMillis();
         FilterItem c = new FilterItem(s1, OperatorType.LESS_THAN, new java.sql.Date(currentTimeMillis));
@@ -332,7 +331,8 @@ public class FilterItemTest extends TestCase {
         FilterItem filter = new FilterItem(LogicalOperator.AND, c1, c2, c3);
         assertEquals("(Col1 LIKE 'foo%' AND Col1 LIKE '%bar' AND Col1 <> 'foobar')", filter.toString());
 
-        CachingDataSetHeader header = new CachingDataSetHeader(Lists.newArrayList(s1));
+        SelectItem[] items = new SelectItem[] { s1 };
+        CachingDataSetHeader header = new CachingDataSetHeader(items);
         assertTrue(filter.evaluate(new DefaultRow(header, new Object[] { "foo bar" })));
         assertTrue(filter.evaluate(new DefaultRow(header, new Object[] { "foosenbar" })));
         assertFalse(filter.evaluate(new DefaultRow(header, new Object[] { "foo" })));
@@ -373,16 +373,15 @@ public class FilterItemTest extends TestCase {
         DataContext dc = new QueryPostprocessDataContext() {
 
             @Override
-            public DataSet materializeMainSchemaTable(Table table, List<Column> columns, int maxRows) {
+            public DataSet materializeMainSchemaTable(Table table, Column[] columns, int maxRows) {
                 // we expect 3 columns to be materialized because the query has column references in both SELECT and WHERE clause
-                assertEquals(3, columns.size());
-                assertEquals("column_number", columns.get(0).getName());
-                assertEquals("name", columns.get(1).getName());
-                assertEquals("role", columns.get(2).getName());
-
-                DataSetHeader header = new CachingDataSetHeader(Lists.newArrayList(col1, col2, col3).stream()
-                        .map(SelectItem::new)
-                        .collect(Collectors.toList()));
+                assertEquals(3, columns.length);
+                assertEquals("column_number", columns[0].getName());
+                assertEquals("name", columns[1].getName());
+                assertEquals("role", columns[2].getName());
+                SelectItem[] selectItems = new SelectItem[] { new SelectItem(col1), new SelectItem(col2),
+                        new SelectItem(col3) };
+                DataSetHeader header = new CachingDataSetHeader(selectItems);
                 List<Row> rows = new LinkedList<Row>();
                 rows.add(new DefaultRow(header, new Object[] { "foo", "bar", 1 }));
                 rows.add(new DefaultRow(header, new Object[] { "kasper", "developer", 2 }));
@@ -463,7 +462,8 @@ public class FilterItemTest extends TestCase {
         Object operand = new String[] { "foo", "bar" };
 
         FilterItem filterItem = new FilterItem(selectItem, OperatorType.IN, operand);
-        DataSetHeader header = new CachingDataSetHeader(Lists.newArrayList(selectItem));
+        SelectItem[] selectItems = new SelectItem[] { selectItem };
+        DataSetHeader header = new CachingDataSetHeader(selectItems);
 
         assertTrue(filterItem.evaluate(new DefaultRow(header, new Object[] { "foo" })));
         assertTrue(filterItem.evaluate(new DefaultRow(header, new Object[] { "bar" })));

@@ -18,8 +18,6 @@
  */
 package org.apache.metamodel.util;
 
-import java.util.function.Function;
-
 /**
  * Represents an abstract function, which is an executable piece of
  * functionality that has an input and an output. A {@link Func} has a return
@@ -29,17 +27,8 @@ import java.util.function.Function;
  *            the input type
  * @param <O>
  *            the output type
- * @deprecated use {@link Function} instead
  */
-@Deprecated
-@FunctionalInterface
-public interface Func<I, O> extends Function<I, O> {
-    
-    @Override
-    default O apply(I t) {
-        // defer to the deprecated signature
-        return eval(t);
-    }
+public interface Func<I, O> {
 
     /**
      * Evaluates an element and transforms it using this function.

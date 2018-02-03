@@ -19,7 +19,6 @@
 package org.apache.metamodel.convert;
 
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 import org.apache.metamodel.data.DataSet;
@@ -68,10 +67,10 @@ public class ConvertedDataSetInterceptor implements DataSetInterceptor, HasReadT
 		}
 
 		boolean hasConverter = false;
-		List<SelectItem> selectItems = dataSet.getSelectItems();
-		TypeConverter<?, ?>[] converterArray = new TypeConverter[selectItems.size()];
-		for (int i = 0; i < selectItems.size(); i++) {
-			SelectItem selectItem = selectItems.get(i);
+		SelectItem[] selectItems = dataSet.getSelectItems();
+		TypeConverter<?, ?>[] converterArray = new TypeConverter[selectItems.length];
+		for (int i = 0; i < selectItems.length; i++) {
+			SelectItem selectItem = selectItems[i];
 			Column column = selectItem.getColumn();
 			if (column != null && selectItem.getAggregateFunction() == null) {
 				TypeConverter<?, ?> converter = converters.get(column);

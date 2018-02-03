@@ -19,7 +19,6 @@
 package org.apache.metamodel.data;
 
 import java.io.Serializable;
-import java.util.List;
 
 import org.apache.metamodel.query.SelectItem;
 import org.apache.metamodel.schema.Column;
@@ -97,7 +96,7 @@ public interface Row extends Serializable {
      * 
      * @return
      */
-    public List<SelectItem> getSelectItems();
+    public SelectItem[] getSelectItems();
 
     /**
      * Gets the values of the row, represented as an object array
@@ -105,6 +104,17 @@ public interface Row extends Serializable {
      * @return an array of objects, containing the values of this row.
      */
     public Object[] getValues();
+
+    /**
+     * Creates a row similar to this one but only with a subset of the values.
+     * 
+     * @param selectItems
+     *            the select items (~ columns) to sub-select the row with
+     * @return a new Row object containing only the select items requested
+     * @deprecated use {@link #getSubSelection(DataSetHeader)} instead.
+     */
+    @Deprecated
+    public Row getSubSelection(SelectItem[] selectItems);
 
     /**
      * Creates a row similar to this one but only with a subset of the values.

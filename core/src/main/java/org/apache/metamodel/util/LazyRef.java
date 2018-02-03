@@ -20,7 +20,6 @@ package org.apache.metamodel.util;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.function.Supplier;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,7 +29,7 @@ import org.slf4j.LoggerFactory;
  * 
  * @param <E>
  */
-public abstract class LazyRef<E> implements Supplier<E> {
+public abstract class LazyRef<E> implements Ref<E> {
 
     private static final Logger logger = LoggerFactory.getLogger(LazyRef.class);
 

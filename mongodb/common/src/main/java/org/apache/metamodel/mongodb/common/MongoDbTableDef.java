@@ -16,22 +16,31 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.metamodel.util;
+package org.apache.metamodel.mongodb.common;
 
 import java.io.Serializable;
 
+import org.apache.metamodel.schema.ColumnType;
+import org.apache.metamodel.util.SimpleTableDef;
+
 /**
- * {@link Func} useful for mapping {@link HasName} instances to names, using
- * {@link CollectionUtils#map(Object[], Func)} and
- * {@link CollectionUtils#map(Iterable, Func)}.
+ * Defines a table layout for MongoDB tables. This class can
+ * be used as an instruction set for the MongoDB DataContext implementations to specify
+ * which collections, which columns (and their types) should be included in the
+ * schema structure of a Mongo DB database.
+ * 
+ * @deprecated use {@link SimpleTableDef} instead.
  */
-public final class HasNameMapper implements Func<HasName, String>, Serializable {
+@Deprecated
+public final class MongoDbTableDef extends SimpleTableDef implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
-    @Override
-	public String eval(HasName arg) {
-		return arg.getName();
-	}
+    public MongoDbTableDef(String name, String[] columnNames, ColumnType[] columnTypes) {
+        super(name, columnNames, columnTypes);
+    }
 
+    public MongoDbTableDef(String name, String[] columnNames) {
+        super(name, columnNames);
+    }
 }

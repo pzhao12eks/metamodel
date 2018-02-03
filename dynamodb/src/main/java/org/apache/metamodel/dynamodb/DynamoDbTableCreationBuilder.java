@@ -63,7 +63,8 @@ class DynamoDbTableCreationBuilder extends AbstractTableCreationBuilder<DynamoDb
                 DynamoDbDataContext.SYSTEM_PROPERTY_THROUGHPUT_WRITE_CAPACITY, "5"));
         final ProvisionedThroughput provisionedThroughput = new ProvisionedThroughput(readCapacity, writeCapacity);
 
-        for (Column column : table.getColumns()) {
+        final Column[] columns = table.getColumns();
+        for (Column column : columns) {
             if (column.isPrimaryKey()) {
                 final KeyType keyType = getKeyType(column.getRemarks());
                 keySchema.add(new KeySchemaElement(column.getName(), keyType));

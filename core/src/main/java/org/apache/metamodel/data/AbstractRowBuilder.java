@@ -19,10 +19,7 @@
 package org.apache.metamodel.data;
 
 import java.util.Arrays;
-import java.util.List;
-import java.util.stream.Collectors;
 
-import org.apache.metamodel.query.SelectItem;
 import org.apache.metamodel.schema.Column;
 import org.apache.metamodel.schema.Table;
 
@@ -40,8 +37,8 @@ public abstract class AbstractRowBuilder<RB extends RowBuilder<?>> implements Ro
         this(table.getColumns());
     }
 
-    public AbstractRowBuilder(List<Column> columns) {
-        _columns = columns.toArray(new Column[columns.size()]);
+    public AbstractRowBuilder(Column[] columns) {
+        _columns = columns;
         _explicitNulls = new boolean[_columns.length];
         _values = new Object[_columns.length];
         _styles = new Style[_columns.length];
@@ -71,7 +68,7 @@ public abstract class AbstractRowBuilder<RB extends RowBuilder<?>> implements Ro
 
     @Override
     public final Row toRow() {
-        return new DefaultRow(new SimpleDataSetHeader(Arrays.stream(_columns).map(SelectItem::new).collect(Collectors.toList())), _values);
+        return new DefaultRow(new SimpleDataSetHeader(_columns), _values);
     }
 
     @Override

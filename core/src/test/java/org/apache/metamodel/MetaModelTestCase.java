@@ -86,7 +86,7 @@ public abstract class MetaModelTestCase extends TestCase {
      * <li>Views: The ProjectContributor view</li>
      * </ul>
      */
-    public static Schema getExampleSchema() {
+    protected Schema getExampleSchema() {
         MutableSchema schema = new MutableSchema("MetaModelSchema");
 
         MutableTable table1 = new MutableTable(TABLE_CONTRIBUTOR, TableType.TABLE, schema);
@@ -124,25 +124,25 @@ public abstract class MetaModelTestCase extends TestCase {
         table4.setColumns(columnList);
 
         // one-Contributor-to-many-Role's
-        MutableRelationship.createRelationship( column1 , column8 );
+        MutableRelationship.createRelationship(new Column[] { column1 }, new Column[] { column8 });
 
         // one-Project-to-many-Role's
-        MutableRelationship.createRelationship(column4 , column9 );
+        MutableRelationship.createRelationship(new Column[] { column4 }, new Column[] { column9 });
 
         // view relation [contributor -> contributor_name]
-        MutableRelationship.createRelationship(column2 , column11 );
+        MutableRelationship.createRelationship(new Column[] { column2 }, new Column[] { column11 });
 
         // view relation [project -> project_name]
-        MutableRelationship.createRelationship(column5 , column12 );
+        MutableRelationship.createRelationship(new Column[] { column5 }, new Column[] { column12 });
 
         // view relation [role -> role_name]
-        MutableRelationship.createRelationship( column10 ,  column13 );
+        MutableRelationship.createRelationship(new Column[] { column10 }, new Column[] { column13 });
 
         schema.setTables(table1, table2, table3, table4);
         return schema;
     }
 
-    protected static DataSet createDataSet(List<SelectItem> selectItems, List<Object[]> data) {
+    protected static DataSet createDataSet(SelectItem[] selectItems, List<Object[]> data) {
         if (data.isEmpty()) {
             return new EmptyDataSet(selectItems);
         }
@@ -179,7 +179,7 @@ public abstract class MetaModelTestCase extends TestCase {
     }
 
     public void assertEquals(DataSet ds1, DataSet ds2) {
-        assertEquals(Arrays.toString(ds1.getSelectItems().toArray()), Arrays.toString(ds2.getSelectItems().toArray()));
+        assertEquals(Arrays.toString(ds1.getSelectItems()), Arrays.toString(ds2.getSelectItems()));
         boolean ds1next = true;
         while (ds1next) {
             ds1next = ds1.next();

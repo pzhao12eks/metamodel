@@ -19,7 +19,6 @@
 package org.apache.metamodel.data;
 
 import java.io.Serializable;
-import java.util.List;
 
 import org.apache.metamodel.query.SelectItem;
 import org.apache.metamodel.schema.Column;
@@ -30,7 +29,7 @@ import org.apache.metamodel.schema.Column;
  */
 public interface DataSetHeader extends Serializable {
 
-    public List<SelectItem> getSelectItems();
+    public SelectItem[] getSelectItems();
 
     public int size();
 

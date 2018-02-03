@@ -24,13 +24,12 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
-import java.util.stream.Collectors;
 
 import org.apache.metamodel.DataContext;
 import org.apache.metamodel.MetaModelException;
+import org.apache.metamodel.MetaModelHelper;
 import org.apache.metamodel.QueryPostprocessDataContext;
 import org.apache.metamodel.UpdateScript;
-import org.apache.metamodel.UpdateSummary;
 import org.apache.metamodel.UpdateableDataContext;
 import org.apache.metamodel.data.DataSet;
 import org.apache.metamodel.data.MaxRowsDataSet;
@@ -49,8 +48,6 @@ import org.apache.metamodel.util.SimpleTableDef;
 public class PojoDataContext extends QueryPostprocessDataContext implements UpdateableDataContext, Serializable {
 
     private static final long serialVersionUID = 1L;
-    
-    public static final String DEFAULT_SCHEMA_NAME = "Schema";
 
     private final Map<String, TableDataProvider<?>> _tables;
     private final String _schemaName;
@@ -70,7 +67,7 @@ public class PojoDataContext extends QueryPostprocessDataContext implements Upda
      * @param tables
      */
     public PojoDataContext(List<TableDataProvider<?>> tables) {
-        this(DEFAULT_SCHEMA_NAME, tables);
+        this("Schema", tables);
     }
 
     /**
@@ -105,13 +102,13 @@ public class PojoDataContext extends QueryPostprocessDataContext implements Upda
     }
 
     @Override
-    protected DataSet materializeMainSchemaTable(Table table, List<Column> columns, int maxRows) {
+    protected DataSet materializeMainSchemaTable(Table table, Column[] columns, int maxRows) {
         final TableDataProvider<?> pojoTable = _tables.get(table.getName());
         if (pojoTable == null) {
             throw new IllegalArgumentException("No such POJO table: " + table.getName());
         }
 
-        final List<SelectItem> selectItems = columns.stream().map(SelectItem::new).collect(Collectors.toList());
+        final SelectItem[] selectItems = MetaModelHelper.createSelectItems(columns);
 
         @SuppressWarnings({ "rawtypes", "unchecked" })
         DataSet dataSet = new PojoDataSet(pojoTable, selectItems);
@@ -143,12 +140,11 @@ public class PojoDataContext extends QueryPostprocessDataContext implements Upda
     }
 
     @Override
-    public UpdateSummary executeUpdate(UpdateScript update) {
-        final PojoUpdateCallback updateCallback = new PojoUpdateCallback(this);
+    public void executeUpdate(UpdateScript update) {
+        PojoUpdateCallback updateCallback = new PojoUpdateCallback(this);
         synchronized (this) {
             update.run(updateCallback);
         }
-        return updateCallback.getUpdateSummary();
     }
 
     protected void addTableDataProvider(TableDataProvider<?> tableDataProvider) {

@@ -19,8 +19,6 @@
 package org.apache.metamodel.schema;
 
 import java.util.Arrays;
-import java.util.Collection;
-import java.util.List;
 
 import org.apache.metamodel.MetaModelTestCase;
 
@@ -30,7 +28,7 @@ public class SchemaModelTest extends MetaModelTestCase {
         Schema schema = getExampleSchema();
         assertEquals("MetaModelSchema", schema.getName());
         assertEquals("Schema[name=MetaModelSchema]", schema.toString());
-        assertEquals(5, schema.getRelationships().size());
+        assertEquals(5, schema.getRelationships().length);
 
         assertEquals(4, schema.getTableCount());
         assertEquals(3, schema.getTableCount(TableType.TABLE));
@@ -49,18 +47,18 @@ public class SchemaModelTest extends MetaModelTestCase {
         assertNotNull(projectTable.getColumnByName("project_id"));
 
         assertEquals("[project_id, name, lines_of_code, parent_project_id]",
-                Arrays.toString(projectTable.getColumnNames().toArray()));
+                Arrays.toString(projectTable.getColumnNames()));
 
         assertEquals(
                 "[Column[name=project_id,columnNumber=0,type=INTEGER,nullable=false,nativeType=null,columnSize=null], "
                         + "Column[name=lines_of_code,columnNumber=2,type=BIGINT,nullable=true,nativeType=null,columnSize=null], "
                         + "Column[name=parent_project_id,columnNumber=3,type=INTEGER,nullable=true,nativeType=null,columnSize=null]]",
-                Arrays.toString(projectTable.getNumberColumns().toArray()));
+                Arrays.toString(projectTable.getNumberColumns()));
 
         assertEquals("[Column[name=name,columnNumber=1,type=VARCHAR,nullable=false,nativeType=null,columnSize=null]]",
-                Arrays.toString(projectTable.getLiteralColumns().toArray()));
+                Arrays.toString(projectTable.getLiteralColumns()));
 
-        assertEquals("[]", Arrays.toString(projectTable.getTimeBasedColumns().toArray()));
+        assertEquals("[]", Arrays.toString(projectTable.getTimeBasedColumns()));
 
         assertNull(projectTable.getColumnByName("foobar"));
         assertNull(projectTable.getColumnByName(null));
@@ -73,34 +71,34 @@ public class SchemaModelTest extends MetaModelTestCase {
         assertEquals(3, projectContributorView.getColumnCount());
         assertEquals(3, projectContributorView.getRelationshipCount());
 
-        Collection<Relationship> projectContributorToContributorRelations = projectContributorView
+        Relationship[] projectContributorToContributorRelations = projectContributorView
                 .getRelationships(contributorTable);
-        assertEquals(1, projectContributorToContributorRelations.size());
-        Collection<Relationship> contributorToProjectContributorRelations = contributorTable
+        assertEquals(1, projectContributorToContributorRelations.length);
+        Relationship[] contributorToProjectContributorRelations = contributorTable
                 .getRelationships(projectContributorView);
-        assertEquals(1, contributorToProjectContributorRelations.size());
-        assertTrue(projectContributorToContributorRelations.equals(contributorToProjectContributorRelations));
+        assertEquals(1, contributorToProjectContributorRelations.length);
+        assertTrue(Arrays.equals(projectContributorToContributorRelations, contributorToProjectContributorRelations));
 
         assertEquals(
                 "Relationship[primaryTable=contributor,primaryColumns=[name],foreignTable=project_contributor,foreignColumns=[contributor]]",
-                projectContributorToContributorRelations.iterator().next().toString());
+                projectContributorToContributorRelations[0].toString());
 
-        ((MutableRelationship) projectContributorToContributorRelations.iterator().next()).remove();
+        ((MutableRelationship) projectContributorToContributorRelations[0]).remove();
         projectContributorToContributorRelations = projectContributorView.getRelationships(contributorTable);
-        assertEquals(0, projectContributorToContributorRelations.size());
+        assertEquals(0, projectContributorToContributorRelations.length);
         contributorToProjectContributorRelations = contributorTable.getRelationships(projectContributorView);
-        assertEquals(0, contributorToProjectContributorRelations.size());
+        assertEquals(0, contributorToProjectContributorRelations.length);
 
         // Get primary keys / Get foreign keys test
         assertEquals(
                 "[Column[name=contributor_id,columnNumber=0,type=INTEGER,nullable=false,nativeType=null,columnSize=null]]",
-                Arrays.toString(contributorTable.getPrimaryKeys().toArray()));
-        assertEquals("[]", Arrays.toString(contributorTable.getForeignKeys().toArray()));
+                Arrays.toString(contributorTable.getPrimaryKeys()));
+        assertEquals("[]", Arrays.toString(contributorTable.getForeignKeys()));
 
         assertEquals(
                 "[Column[name=contributor_id,columnNumber=0,type=INTEGER,nullable=false,nativeType=null,columnSize=null], Column[name=project_id,columnNumber=1,type=INTEGER,nullable=false,nativeType=null,columnSize=null]]",
-                Arrays.toString(roleTable.getPrimaryKeys().toArray()));
-        List<Column> foreignKeys = roleTable.getForeignKeys();
-        assertEquals(2, foreignKeys.size());
+                Arrays.toString(roleTable.getPrimaryKeys()));
+        Column[] foreignKeys = roleTable.getForeignKeys();
+        assertEquals(2, foreignKeys.length);
     }
 }

@@ -20,13 +20,12 @@ package org.apache.metamodel.excel;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.List;
+import java.io.InputStream;
 
 import org.apache.metamodel.DataContext;
 import org.apache.metamodel.MetaModelException;
 import org.apache.metamodel.QueryPostprocessDataContext;
 import org.apache.metamodel.UpdateScript;
-import org.apache.metamodel.UpdateSummary;
 import org.apache.metamodel.UpdateableDataContext;
 import org.apache.metamodel.data.DataSet;
 import org.apache.metamodel.schema.Column;
@@ -34,6 +33,7 @@ import org.apache.metamodel.schema.MutableSchema;
 import org.apache.metamodel.schema.Schema;
 import org.apache.metamodel.schema.Table;
 import org.apache.metamodel.util.FileResource;
+import org.apache.metamodel.util.Func;
 import org.apache.metamodel.util.Resource;
 import org.apache.poi.POIXMLDocument;
 import org.slf4j.Logger;
@@ -113,6 +113,20 @@ public final class ExcelDataContext extends QueryPostprocessDataContext implemen
     }
 
     /**
+     * Gets the Excel file being read.
+     * 
+     * @return a file.
+     * @deprecated
+     */
+    @Deprecated
+    public File getFile() {
+        if (_resource instanceof FileResource) {
+            return ((FileResource) _resource).getFile();
+        }
+        return null;
+    }
+
+    /**
      * Gets the Excel resource being read
      * 
      * @return
@@ -127,7 +141,7 @@ public final class ExcelDataContext extends QueryPostprocessDataContext implemen
     }
 
     @Override
-    public DataSet materializeMainSchemaTable(Table table, List<Column> columns, int maxRows) {
+    public DataSet materializeMainSchemaTable(Table table, Column[] columns, int maxRows) {
         try {
             SpreadsheetReaderDelegate delegate = getSpreadsheetReaderDelegate();
 
@@ -185,16 +199,19 @@ public final class ExcelDataContext extends QueryPostprocessDataContext implemen
         if (_spreadsheetReaderDelegate == null) {
             synchronized (this) {
                 if (_spreadsheetReaderDelegate == null) {
-                    _spreadsheetReaderDelegate = _resource.read(in -> {
-                        try {
-                            if (POIXMLDocument.hasOOXMLHeader(in)) {
-                                return new XlsxSpreadsheetReaderDelegate(_resource, _configuration);
-                            } else {
+                    _spreadsheetReaderDelegate = _resource.read(new Func<InputStream, SpreadsheetReaderDelegate>() {
+                        @Override
+                        public SpreadsheetReaderDelegate eval(InputStream in) {
+                            try {
+                                if (POIXMLDocument.hasOOXMLHeader(in)) {
+                                    return new XlsxSpreadsheetReaderDelegate(_resource, _configuration);
+                                } else {
+                                    return new DefaultSpreadsheetReaderDelegate(_resource, _configuration);
+                                }
+                            } catch (IOException e) {
+                                logger.warn("Could not identify spreadsheet type, using default", e);
                                 return new DefaultSpreadsheetReaderDelegate(_resource, _configuration);
                             }
-                        } catch (IOException e) {
-                            logger.warn("Could not identify spreadsheet type, using default", e);
-                            return new DefaultSpreadsheetReaderDelegate(_resource, _configuration);
                         }
                     });
                 }
@@ -208,8 +225,8 @@ public final class ExcelDataContext extends QueryPostprocessDataContext implemen
     }
 
     @Override
-    public UpdateSummary executeUpdate(UpdateScript update) {
-        final ExcelUpdateCallback updateCallback = new ExcelUpdateCallback(this);
+    public void executeUpdate(UpdateScript update) {
+        ExcelUpdateCallback updateCallback = new ExcelUpdateCallback(this);
         synchronized (WRITE_LOCK) {
             try {
                 update.run(updateCallback);
@@ -217,6 +234,5 @@ public final class ExcelDataContext extends QueryPostprocessDataContext implemen
                 updateCallback.close();
             }
         }
-        return updateCallback.getUpdateSummary();
     }
 }

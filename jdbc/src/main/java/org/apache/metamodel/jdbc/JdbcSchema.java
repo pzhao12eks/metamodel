@@ -22,8 +22,8 @@ import java.io.ObjectStreamException;
 import java.sql.Connection;
 
 import org.apache.metamodel.schema.MutableSchema;
+import org.apache.metamodel.schema.MutableTable;
 import org.apache.metamodel.schema.Schema;
-import org.apache.metamodel.schema.Table;
 
 /**
  * Schema implementation for JDBC data contexts
@@ -59,7 +59,8 @@ final class JdbcSchema extends MutableSchema {
     }
 
     public Schema toSerializableForm() {
-        for (Table table : getTables()) {
+        MutableTable[] tables = getTables();
+        for (MutableTable table : tables) {
             table.getColumns();
             table.getIndexedColumns();
             table.getPrimaryKeys();

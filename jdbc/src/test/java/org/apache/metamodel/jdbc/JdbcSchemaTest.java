@@ -54,7 +54,7 @@ public class JdbcSchemaTest extends JdbcTestCase {
 
 		assertEquals(
 				"[CUSTOMERS, CUSTOMER_W_TER, DEPARTMENT_MANAGERS, DIM_TIME, EMPLOYEES, OFFICES, ORDERDETAILS, ORDERFACT, ORDERS, PAYMENTS, PRODUCTS, QUADRANT_ACTUALS, TRIAL_BALANCE]",
-				Arrays.toString(schema.getTableNames().toArray()));
+				Arrays.toString(schema.getTableNames()));
 
 		connection.close();
 		dataContext = null;
@@ -72,14 +72,14 @@ public class JdbcSchemaTest extends JdbcTestCase {
 
 		assertEquals(
 				"[CUSTOMERS, CUSTOMER_W_TER, DEPARTMENT_MANAGERS, DIM_TIME, EMPLOYEES, OFFICES, ORDERDETAILS, ORDERFACT, ORDERS, PAYMENTS, PRODUCTS, QUADRANT_ACTUALS, TRIAL_BALANCE]",
-				Arrays.toString(schema.getTableNames().toArray()));
+				Arrays.toString(schema.getTableNames()));
 
 		Table table = schema.getTableByName("CUSTOMERS");
 		assertTrue(table instanceof JdbcTable);
 		assertNotNull(table);
 		assertEquals(
 				"[CUSTOMERNUMBER, CUSTOMERNAME, CONTACTLASTNAME, CONTACTFIRSTNAME, PHONE, ADDRESSLINE1, ADDRESSLINE2, CITY, STATE, POSTALCODE, COUNTRY, SALESREPEMPLOYEENUMBER, CREDITLIMIT]",
-				Arrays.toString(table.getColumnNames().toArray()));
+				Arrays.toString(table.getColumnNames()));
 	}
 
 	public void testToSerializableForm() throws Exception {
@@ -92,10 +92,10 @@ public class JdbcSchemaTest extends JdbcTestCase {
 		Table table = schema.getTableByName("CUSTOMERS");
 		assertEquals(
 				"[CUSTOMERNUMBER, CUSTOMERNAME, CONTACTLASTNAME, CONTACTFIRSTNAME, PHONE, ADDRESSLINE1, ADDRESSLINE2, CITY, STATE, POSTALCODE, COUNTRY, SALESREPEMPLOYEENUMBER, CREDITLIMIT]",
-				Arrays.toString(table.getColumnNames().toArray()));
+				Arrays.toString(table.getColumnNames()));
 
 		assertEquals(
 				"[Relationship[primaryTable=PRODUCTS,primaryColumns=[PRODUCTCODE],foreignTable=ORDERFACT,foreignColumns=[PRODUCTCODE]]]",
-				Arrays.toString(schema.getRelationships().toArray()));
+				Arrays.toString(schema.getRelationships()));
 	}
 }

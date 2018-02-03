@@ -85,7 +85,8 @@ public class DB2Test extends AbstractJdbIntegrationTest {
         }
         JdbcDataContext dc = new JdbcDataContext(getConnection());
         Schema schema = dc.getDefaultSchema();
-        System.out.println("Tables: " + Arrays.toString(schema.getTableNames().toArray()));
+        String[] tableNames = schema.getTableNames();
+        System.out.println("Tables: " + Arrays.toString(tableNames));
 
         Table countryTable = schema.getTableByName("COUNTRY");
         assertNotNull(countryTable);
@@ -109,7 +110,8 @@ public class DB2Test extends AbstractJdbIntegrationTest {
         }
         JdbcDataContext dc = new JdbcDataContext(getConnection());
         Schema schema = dc.getDefaultSchema();
-        System.out.println("Tables: " + Arrays.toString(schema.getTableNames().toArray()));
+        String[] tableNames = schema.getTableNames();
+        System.out.println("Tables: " + Arrays.toString(tableNames));
 
         Table countryTable = schema.getTableByName("COUNTRY");
         assertNotNull(countryTable);

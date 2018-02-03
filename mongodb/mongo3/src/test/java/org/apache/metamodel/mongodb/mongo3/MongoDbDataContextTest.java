@@ -24,6 +24,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import com.mongodb.BasicDBObject;
+import com.mongodb.DBCollection;
+import com.mongodb.WriteConcern;
+
 import org.apache.metamodel.DataContext;
 import org.apache.metamodel.UpdateCallback;
 import org.apache.metamodel.UpdateScript;
@@ -39,7 +43,6 @@ import org.bson.Document;
 
 import com.mongodb.MongoClient;
 import com.mongodb.MongoClientURI;
-import com.mongodb.WriteConcern;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
 
@@ -262,7 +265,7 @@ public class MongoDbDataContextTest extends MongoDbTestCase {
         assertTrue(Arrays.asList(dataContext.getDefaultSchema().getTableNames()).contains(getCollectionName()));
         
         Table table = dataContext.getDefaultSchema().getTableByName(getCollectionName());
-        assertEquals("[_id, baz, foo, id, list, name]", Arrays.toString(table.getColumnNames().toArray()));
+        assertEquals("[_id, baz, foo, id, list, name]", Arrays.toString(table.getColumnNames()));
 
         assertEquals(ColumnType.MAP, table.getColumnByName("baz").getType());
         assertEquals(ColumnType.STRING, table.getColumnByName("foo").getType());
@@ -442,7 +445,7 @@ public class MongoDbDataContextTest extends MongoDbTestCase {
         // do a query that we cannot push to mongo
         // Replace column index 0 by 1
         ds = dataContext.query().from(getCollectionName())
-                .select(FunctionType.SUM, dataContext.getDefaultSchema().getTables().get(0).getColumnByName("id"))
+                .select(FunctionType.SUM, dataContext.getDefaultSchema().getTables()[0].getColumnByName("id"))
                 .where("foo").isEquals("bar").execute();
         assertEquals(InMemoryDataSet.class, ds.getClass());
 
@@ -460,7 +463,8 @@ public class MongoDbDataContextTest extends MongoDbTestCase {
         dc.executeUpdate(new UpdateScript() {
             @Override
             public void run(UpdateCallback callback) {
-                for (Table table : defaultSchema.getTables()) {
+                Table[] tables = defaultSchema.getTables();
+                for (Table table : tables) {
                     callback.deleteFrom(table).execute();
                 }
             }
@@ -495,8 +499,8 @@ public class MongoDbDataContextTest extends MongoDbTestCase {
         dataSet = dc.query().from("some_entries").selectCount().execute();
         dataSet.close();
         assertTrue(dataSet.next());
-        assertEquals(1, dataSet.getSelectItems().size());
-        assertEquals(SelectItem.getCountAllItem(), dataSet.getSelectItems().get(0));
+        assertEquals(1, dataSet.getSelectItems().length);
+        assertEquals(SelectItem.getCountAllItem(), dataSet.getSelectItems()[0]);
         assertEquals(4l, dataSet.getRow().getValue(SelectItem.getCountAllItem()));
         assertFalse(dataSet.next());
         assertEquals(InMemoryDataSet.class, dataSet.getClass());
@@ -505,8 +509,8 @@ public class MongoDbDataContextTest extends MongoDbTestCase {
         dataSet = dc.query().from("some_entries").selectCount().where("foo").greaterThan(2).execute();
         dataSet.close();
         assertTrue(dataSet.next());
-        assertEquals(1, dataSet.getSelectItems().size());
-        assertEquals(SelectItem.getCountAllItem(), dataSet.getSelectItems().get(0));
+        assertEquals(1, dataSet.getSelectItems().length);
+        assertEquals(SelectItem.getCountAllItem(), dataSet.getSelectItems()[0]);
         assertEquals(2l, dataSet.getRow().getValue(SelectItem.getCountAllItem()));
         assertFalse(dataSet.next());
         assertEquals(InMemoryDataSet.class, dataSet.getClass());
@@ -629,7 +633,7 @@ public class MongoDbDataContextTest extends MongoDbTestCase {
                         "addresses[5].foobar" }));
 
         final DataSet ds1 = dc.executeQuery("select gender as my_gender, name.first as my_name from my_collection where gender LIKE '%MALE%'");
-        final SelectItem[] selectItems = ds1.getSelectItems().toArray(new SelectItem[ds1.getSelectItems().size()]);
+        final SelectItem[] selectItems = ds1.getSelectItems();
         SelectItem firstSelectItem = selectItems[0];
         SelectItem secondSelectItem = selectItems[1];
         try {

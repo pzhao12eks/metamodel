@@ -22,7 +22,6 @@ import java.nio.channels.UnsupportedAddressTypeException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.stream.Collectors;
 
 import javax.swing.table.TableModel;
 
@@ -62,7 +61,7 @@ public class QueryPostprocessDataContextTest extends MetaModelTestCase {
 
     public void testQueryMaxRows0() throws Exception {
         final MockDataContext dc = new MockDataContext("sch", "tab", "1");
-        final Table table = dc.getDefaultSchema().getTable(0);
+        final Table table = dc.getDefaultSchema().getTables()[0];
         final DataSet dataSet = dc.query().from(table).selectAll().limit(0).execute();
         assertTrue(dataSet instanceof EmptyDataSet);
         assertFalse(dataSet.next());
@@ -78,12 +77,12 @@ public class QueryPostprocessDataContextTest extends MetaModelTestCase {
 
         final QueryPostprocessDataContext dc = new QueryPostprocessDataContext() {
             @Override
-            protected DataSet materializeMainSchemaTable(Table table, List<Column> columns, int maxRows) {
-                Object[] values = new Object[columns.size()];
-                for (int i = 0; i < columns.size(); i++) {
-                    values[i] = columns.get(i).getColumnNumber();
+            protected DataSet materializeMainSchemaTable(Table table, Column[] columns, int maxRows) {
+                Object[] values = new Object[columns.length];
+                for (int i = 0; i < columns.length; i++) {
+                    values[i] = columns[i].getColumnNumber();
                 }
-                DataSetHeader header = new SimpleDataSetHeader(columns.stream().map(SelectItem::new).collect(Collectors.toList()));
+                DataSetHeader header = new SimpleDataSetHeader(columns);
                 DefaultRow row = new DefaultRow(header, values);
                 return new InMemoryDataSet(row);
             }
@@ -111,13 +110,13 @@ public class QueryPostprocessDataContextTest extends MetaModelTestCase {
 
     public void testAggregateQueryNoWhereClause() throws Exception {
         MockDataContext dc = new MockDataContext("sch", "tab", "1");
-        Table table = dc.getDefaultSchema().getTable(0);
+        Table table = dc.getDefaultSchema().getTables()[0];
         assertSingleRowResult("Row[values=[4]]", dc.query().from(table).selectCount().execute());
     }
 
     public void testAggregateQueryRegularWhereClause() throws Exception {
         MockDataContext dc = new MockDataContext("sch", "tab", "1");
-        Table table = dc.getDefaultSchema().getTable(0);
+        Table table = dc.getDefaultSchema().getTables()[0];
         assertSingleRowResult("Row[values=[3]]", dc.query().from(table).selectCount().where("baz").eq("world")
                 .execute());
     }
@@ -125,10 +124,14 @@ public class QueryPostprocessDataContextTest extends MetaModelTestCase {
     public void testApplyFunctionToNullValues() throws Exception {
         QueryPostprocessDataContext dataContext = new QueryPostprocessDataContext() {
             @Override
-            public DataSet materializeMainSchemaTable(Table table, List<Column> columns, int maxRows) {
+            public DataSet materializeMainSchemaTable(Table table, Column[] columns, int maxRows) {
                 if (table == table1) {
-                    List<Column> columns1 = table1.getColumns();
-                    List<SelectItem> selectItems = columns1.stream().map(SelectItem::new).collect(Collectors.toList());
+                    Column[] columns1 = table1.getColumns();
+                    SelectItem[] selectItems = new SelectItem[columns1.length];
+                    for (int i = 0; i < selectItems.length; i++) {
+                        SelectItem selectItem = new SelectItem(columns1[i]);
+                        selectItems[i] = selectItem;
+                    }
                     List<Object[]> data = new ArrayList<Object[]>();
                     data.add(new Object[] { 1, "no nulls", 1 });
                     data.add(new Object[] { 2, "onlynull", null });
@@ -172,7 +175,7 @@ public class QueryPostprocessDataContextTest extends MetaModelTestCase {
 
     public void testGroupByNulls() throws Exception {
         MockDataContext dc = new MockDataContext("sch", "tab", null);
-        Table table = dc.getDefaultSchema().getTable(0);
+        Table table = dc.getDefaultSchema().getTables()[0];
         DataSet dataSet = dc.query().from(table).select(FunctionType.SUM, "foo").select("baz").groupBy("baz").execute();
         assertTrue(dataSet.next());
         assertEquals("Row[values=[7.0, world]]", dataSet.getRow().toString());
@@ -184,7 +187,7 @@ public class QueryPostprocessDataContextTest extends MetaModelTestCase {
 
     public void testNewAggregateFunctions() throws Exception {
         MockDataContext dc = new MockDataContext("sch", "tab", null);
-        Table table = dc.getDefaultSchema().getTable(0);
+        Table table = dc.getDefaultSchema().getTables()[0];
         DataSet dataSet = dc.query().from(table).select(FunctionType.FIRST, "foo").select(FunctionType.LAST, "foo")
                 .select(FunctionType.RANDOM, "foo").execute();
         assertTrue(dataSet.next());
@@ -223,10 +226,10 @@ public class QueryPostprocessDataContextTest extends MetaModelTestCase {
 
     public void testMixedAggregateAndRawQuery() throws Exception {
         MockDataContext dc = new MockDataContext("sch", "tab", "1");
-        Table table = dc.getDefaultSchema().getTable(0);
-        List<Column> columns = table.getColumns();
+        Table table = dc.getDefaultSchema().getTables()[0];
+        Column[] columns = table.getColumns();
 
-        Query query = dc.query().from(table).select(FunctionType.MAX, columns.get(0)).and(columns.get(1)).toQuery();
+        Query query = dc.query().from(table).select(FunctionType.MAX, columns[0]).and(columns[1]).toQuery();
         assertEquals("SELECT MAX(tab.foo), tab.bar FROM sch.tab", query.toSql());
 
         DataSet ds = dc.executeQuery(query);
@@ -243,7 +246,7 @@ public class QueryPostprocessDataContextTest extends MetaModelTestCase {
 
     public void testScalarFunctionSelect() throws Exception {
         MockDataContext dc = new MockDataContext("sch", "tab", "1");
-        Table table = dc.getDefaultSchema().getTable(0);
+        Table table = dc.getDefaultSchema().getTables()[0];
 
         Query query = dc.query().from(table).select("foo").select(FunctionType.TO_NUMBER, "foo").select("bar")
                 .select(FunctionType.TO_STRING, "bar").select(FunctionType.TO_NUMBER, "bar").toQuery();
@@ -275,7 +278,7 @@ public class QueryPostprocessDataContextTest extends MetaModelTestCase {
 
     public void testScalarFunctionWhere() throws Exception {
         MockDataContext dc = new MockDataContext("sch", "tab", "1");
-        Table table = dc.getDefaultSchema().getTable(0);
+        Table table = dc.getDefaultSchema().getTables()[0];
 
         Query query = dc.query().from(table).select("foo").where(FunctionType.TO_NUMBER, "bar").eq(1).toQuery();
         assertEquals("SELECT tab.foo FROM sch.tab WHERE TO_NUMBER(tab.bar) = 1", query.toSql());
@@ -294,7 +297,7 @@ public class QueryPostprocessDataContextTest extends MetaModelTestCase {
     public void testSelectItemReferencesToFromItems() throws Exception {
         MockDataContext dc = new MockDataContext("sch", "tab", "1");
 
-        Table table = dc.getDefaultSchema().getTable(0);
+        Table table = dc.getDefaultSchema().getTables()[0];
 
         Query q = new Query();
         FromItem fromItem1 = q.from(table, "t1").getFromClause().getItem(0);
@@ -305,10 +308,10 @@ public class QueryPostprocessDataContextTest extends MetaModelTestCase {
         assertEquals("SELECT t1.foo, t2.foo FROM sch.tab t1, sch.tab t2 WHERE t1.foo = '2'", q.toSql());
 
         DataSet ds = dc.executeQuery(q);
-        List<SelectItem> selectItems = ds.getSelectItems();
-        assertEquals(2, selectItems.size());
-        assertEquals("t1.foo", selectItems.get(0).toSql());
-        assertEquals("t2.foo", selectItems.get(1).toSql());
+        SelectItem[] selectItems = ds.getSelectItems();
+        assertEquals(2, selectItems.length);
+        assertEquals("t1.foo", selectItems[0].toSql());
+        assertEquals("t2.foo", selectItems[1].toSql());
         assertTrue(ds.next());
         assertEquals("Row[values=[2, 1]]", ds.getRow().toString());
         assertTrue(ds.next());
@@ -325,10 +328,14 @@ public class QueryPostprocessDataContextTest extends MetaModelTestCase {
         QueryPostprocessDataContext dataContext = new QueryPostprocessDataContext() {
 
             @Override
-            public DataSet materializeMainSchemaTable(Table table, List<Column> columns, int maxRows) {
+            public DataSet materializeMainSchemaTable(Table table, Column[] columns, int maxRows) {
                 if (table == table1) {
-                    List<Column> columns1 = table1.getColumns();
-                    List<SelectItem> selectItems = columns1.stream().map(SelectItem::new).collect(Collectors.toList());
+                    Column[] columns1 = table1.getColumns();
+                    SelectItem[] selectItems = new SelectItem[columns1.length];
+                    for (int i = 0; i < selectItems.length; i++) {
+                        SelectItem selectItem = new SelectItem(columns1[i]);
+                        selectItems[i] = selectItem;
+                    }
                     List<Object[]> data = new ArrayList<Object[]>();
                     data.add(new Object[] { 1, "kasper", "denmark" });
                     data.add(new Object[] { 2, "asbjorn", "denmark" });
@@ -343,7 +350,12 @@ public class QueryPostprocessDataContextTest extends MetaModelTestCase {
                     }
                     return createDataSet(selectItems, data);
                 } else if (table == table2) {
-                    List<SelectItem> selectItems = table2.getColumns().stream().map(SelectItem::new).collect(Collectors.toList());
+                    Column[] columns2 = table2.getColumns();
+                    SelectItem[] selectItems = new SelectItem[columns2.length];
+                    for (int i = 0; i < selectItems.length; i++) {
+                        SelectItem selectItem = new SelectItem(columns2[i]);
+                        selectItems[i] = selectItem;
+                    }
                     List<Object[]> data = new ArrayList<Object[]>();
                     data.add(new Object[] { 1, 1, "founder" });
                     data.add(new Object[] { 1, 1, "developer" });
@@ -396,25 +408,25 @@ public class QueryPostprocessDataContextTest extends MetaModelTestCase {
 
     public void testInformationSchema() throws Exception {
         DataContext dc = getDataContext();
-        assertEquals("[information_schema, MetaModelSchema]", Arrays.toString(dc.getSchemaNames().toArray()));
+        assertEquals("[information_schema, MetaModelSchema]", Arrays.toString(dc.getSchemaNames()));
         Schema informationSchema = dc.getSchemaByName("information_schema");
         assertEquals(
                 "[Table[name=tables,type=TABLE,remarks=null], Table[name=columns,type=TABLE,remarks=null], Table[name=relationships,type=TABLE,remarks=null]]",
-                Arrays.toString(informationSchema.getTables().toArray()));
+                Arrays.toString(informationSchema.getTables()));
         assertEquals(
                 "[Relationship[primaryTable=tables,primaryColumns=[name],foreignTable=columns,foreignColumns=[table]], "
                         + "Relationship[primaryTable=tables,primaryColumns=[name],foreignTable=relationships,foreignColumns=[primary_table]], "
                         + "Relationship[primaryTable=tables,primaryColumns=[name],foreignTable=relationships,foreignColumns=[foreign_table]], "
                         + "Relationship[primaryTable=columns,primaryColumns=[name],foreignTable=relationships,foreignColumns=[primary_column]], "
                         + "Relationship[primaryTable=columns,primaryColumns=[name],foreignTable=relationships,foreignColumns=[foreign_column]]]",
-                Arrays.toString(informationSchema.getRelationships().toArray()));
+                Arrays.toString(informationSchema.getRelationships()));
         Table tablesTable = informationSchema.getTableByName("tables");
         assertEquals(
                 "[Column[name=name,columnNumber=0,type=VARCHAR,nullable=false,nativeType=null,columnSize=null], "
                         + "Column[name=type,columnNumber=1,type=VARCHAR,nullable=true,nativeType=null,columnSize=null], "
                         + "Column[name=num_columns,columnNumber=2,type=INTEGER,nullable=true,nativeType=null,columnSize=null], "
                         + "Column[name=remarks,columnNumber=3,type=VARCHAR,nullable=true,nativeType=null,columnSize=null]]",
-                Arrays.toString(tablesTable.getColumns().toArray()));
+                Arrays.toString(tablesTable.getColumns()));
         Table columnsTable = informationSchema.getTableByName("columns");
         assertEquals(
                 "[Column[name=name,columnNumber=0,type=VARCHAR,nullable=false,nativeType=null,columnSize=null], "
@@ -425,14 +437,14 @@ public class QueryPostprocessDataContextTest extends MetaModelTestCase {
                         + "Column[name=indexed,columnNumber=5,type=BOOLEAN,nullable=true,nativeType=null,columnSize=null], "
                         + "Column[name=table,columnNumber=6,type=VARCHAR,nullable=false,nativeType=null,columnSize=null], "
                         + "Column[name=remarks,columnNumber=7,type=VARCHAR,nullable=true,nativeType=null,columnSize=null]]",
-                Arrays.toString(columnsTable.getColumns().toArray()));
+                Arrays.toString(columnsTable.getColumns()));
         Table relationshipsTable = informationSchema.getTableByName("relationships");
         assertEquals(
                 "[Column[name=primary_table,columnNumber=0,type=VARCHAR,nullable=false,nativeType=null,columnSize=null], "
                         + "Column[name=primary_column,columnNumber=1,type=VARCHAR,nullable=false,nativeType=null,columnSize=null], "
                         + "Column[name=foreign_table,columnNumber=2,type=VARCHAR,nullable=false,nativeType=null,columnSize=null], "
                         + "Column[name=foreign_column,columnNumber=3,type=VARCHAR,nullable=false,nativeType=null,columnSize=null]]",
-                Arrays.toString(relationshipsTable.getColumns().toArray()));
+                Arrays.toString(relationshipsTable.getColumns()));
 
         DataSet dataSet = dc.query().from(tablesTable).select(tablesTable.getColumns()).execute();
         assertTrue(dataSet.next());
@@ -446,7 +458,7 @@ public class QueryPostprocessDataContextTest extends MetaModelTestCase {
         assertFalse(dataSet.next());
         dataSet.close();
 
-        Relationship relationship = tablesTable.getRelationships(columnsTable).iterator().next();
+        Relationship relationship = tablesTable.getRelationships(columnsTable)[0];
         FromItem joinFromItem = new FromItem(JoinType.INNER, relationship);
         Query q = new Query().select(tablesTable.getColumnByName("name")).select(columnsTable.getColumnByName("name"))
                 .select(columnsTable.getBooleanColumns()).from(joinFromItem);
@@ -480,9 +492,10 @@ public class QueryPostprocessDataContextTest extends MetaModelTestCase {
 
         DataContext dc = getDataContext();
         DataSet data = dc.executeQuery(q);
-        assertEquals(1, data.getSelectItems().size());
+        assertEquals(1, data.getSelectItems().length);
 
-        TableModel tableModel = new DataSetTableModel(data);
+        @SuppressWarnings("deprecation")
+        TableModel tableModel = data.toTableModel();
 
         // should correspond to these lines:
 
@@ -521,10 +534,11 @@ public class QueryPostprocessDataContextTest extends MetaModelTestCase {
         DataContext dc = getDataContext();
 
         DataSet data = dc.executeQuery(q);
-        assertEquals(1, data.getSelectItems().size());
-        assertEquals("SUM(r.project_id)", data.getSelectItems().get(0).toString());
+        assertEquals(1, data.getSelectItems().length);
+        assertEquals("SUM(r.project_id)", data.getSelectItems()[0].toString());
 
-        TableModel tableModel = new DataSetTableModel(data);
+        @SuppressWarnings("deprecation")
+        TableModel tableModel = data.toTableModel();
         assertEquals(3, tableModel.getRowCount());
         assertEquals(1, tableModel.getColumnCount());
         assertEquals(1.0, tableModel.getValueAt(0, 0));
@@ -552,31 +566,31 @@ public class QueryPostprocessDataContextTest extends MetaModelTestCase {
 
         DataContext dc = getDataContext();
         DataSet data = dc.executeQuery(q);
-        assertEquals(1, data.getSelectItems().size());
-        assertEquals("r.name", data.getSelectItems().get(0).toString());
+        assertEquals(1, data.getSelectItems().length);
+        assertEquals("r.name", data.getSelectItems()[0].toString());
         TableModel tableModel = new DataSetTableModel(data);
         assertEquals(3, tableModel.getRowCount());
 
         q.select(new SelectItem(FunctionType.COUNT, "*", "c"));
         q.where(new FilterItem(new SelectItem(roleColumn), OperatorType.EQUALS_TO, "founder"));
         data = dc.executeQuery(q);
-        assertEquals(2, data.getSelectItems().size());
-        assertEquals("r.name", data.getSelectItems().get(0).toString());
-        assertEquals("COUNT(*) AS c", data.getSelectItems().get(1).toString());
+        assertEquals(2, data.getSelectItems().length);
+        assertEquals("r.name", data.getSelectItems()[0].toString());
+        assertEquals("COUNT(*) AS c", data.getSelectItems()[1].toString());
         tableModel = new DataSetTableModel(data);
         assertEquals(1, tableModel.getRowCount());
         assertEquals("founder", tableModel.getValueAt(0, 0));
         assertEquals(2l, tableModel.getValueAt(0, 1));
 
-        q.select(new SelectItem(FunctionType.SUM, table2.getColumn(0)));
+        q.select(new SelectItem(FunctionType.SUM, table2.getColumns()[0]));
         assertEquals(
                 "SELECT r.name, COUNT(*) AS c, SUM(r.contributor_id) FROM MetaModelSchema.role r WHERE r.name = 'founder' GROUP BY r.name",
                 q.toString());
         data = dc.executeQuery(q);
-        assertEquals(3, data.getSelectItems().size());
-        assertEquals("r.name", data.getSelectItems().get(0).toString());
-        assertEquals("COUNT(*) AS c", data.getSelectItems().get(1).toString());
-        assertEquals("SUM(r.contributor_id)", data.getSelectItems().get(2).toString());
+        assertEquals(3, data.getSelectItems().length);
+        assertEquals("r.name", data.getSelectItems()[0].toString());
+        assertEquals("COUNT(*) AS c", data.getSelectItems()[1].toString());
+        assertEquals("SUM(r.contributor_id)", data.getSelectItems()[2].toString());
         tableModel = new DataSetTableModel(data);
         assertEquals(1, tableModel.getRowCount());
         assertEquals("founder", tableModel.getValueAt(0, 0));
@@ -732,7 +746,7 @@ public class QueryPostprocessDataContextTest extends MetaModelTestCase {
         q.select(table1.getColumns());
         q.select(table2.getColumns());
         DataSet data = dc.executeQuery(q);
-        assertEquals(table1.getColumnCount() + table2.getColumnCount(), data.getSelectItems().size());
+        assertEquals(table1.getColumnCount() + table2.getColumnCount(), data.getSelectItems().length);
         for (int i = 0; i < 6 * 8; i++) {
             assertTrue(data.next());
             if (i == 0) {
@@ -831,7 +845,7 @@ public class QueryPostprocessDataContextTest extends MetaModelTestCase {
                 q.toString());
 
         DataSet data = dc.executeQuery(q);
-        assertEquals(2, data.getSelectItems().size());
+        assertEquals(2, data.getSelectItems().length);
         assertTrue(data.next());
         assertEquals("Row[values=[kasper, founder]]", data.getRow().toString());
         assertTrue(data.next());
@@ -876,7 +890,7 @@ public class QueryPostprocessDataContextTest extends MetaModelTestCase {
 
         SelectItem s1 = new SelectItem(table1.getColumnByName(COLUMN_CONTRIBUTOR_NAME));
         SelectItem s2 = new SelectItem(table2.getColumnByName(COLUMN_ROLE_ROLE_NAME));
-        FromItem fromItem = new FromItem(JoinType.INNER, table1.getRelationships(table2).iterator().next());
+        FromItem fromItem = new FromItem(JoinType.INNER, table1.getRelationships(table2)[0]);
 
         Query q = new Query();
         q.select(s1);
@@ -887,7 +901,7 @@ public class QueryPostprocessDataContextTest extends MetaModelTestCase {
                 q.toString());
 
         DataSet data = dc.executeQuery(q);
-        assertEquals(2, data.getSelectItems().size());
+        assertEquals(2, data.getSelectItems().length);
         assertTrue(data.next());
         assertEquals("Row[values=[kasper, founder]]", data.getRow().toString());
         assertTrue(data.next());
@@ -929,7 +943,7 @@ public class QueryPostprocessDataContextTest extends MetaModelTestCase {
 
         DataContext dc = getDataContext();
         DataSet data = dc.executeQuery(q2);
-        assertEquals(1, data.getSelectItems().size());
+        assertEquals(1, data.getSelectItems().length);
         assertTrue(data.next());
         assertEquals("Row[values=[kasper]]", data.getRow().toString());
         assertTrue(data.next());
@@ -956,7 +970,7 @@ public class QueryPostprocessDataContextTest extends MetaModelTestCase {
                 "SELECT d.e AS f FROM (SELECT c.name AS e FROM (SELECT contributor.contributor_id, contributor.name, contributor.country FROM MetaModelSchema.contributor) c) d",
                 q3.toString());
         data = dc.executeQuery(q3);
-        assertEquals(1, data.getSelectItems().size());
+        assertEquals(1, data.getSelectItems().length);
         assertTrue(data.next());
         assertEquals("Row[values=[kasper]]", data.getRow().toString());
         assertTrue(data.next());
@@ -1003,7 +1017,7 @@ public class QueryPostprocessDataContextTest extends MetaModelTestCase {
     public void testExecuteCount() throws Exception {
         QueryPostprocessDataContext dc = new QueryPostprocessDataContext() {
             @Override
-            protected DataSet materializeMainSchemaTable(Table table, List<Column> columns, int maxRows) {
+            protected DataSet materializeMainSchemaTable(Table table, Column[] columns, int maxRows) {
                 throw new UnsupportedOperationException();
             }
 
@@ -1035,7 +1049,7 @@ public class QueryPostprocessDataContextTest extends MetaModelTestCase {
     public void testExecutePrimaryKeyLookupQuery() throws Exception {
         QueryPostprocessDataContext dc = new QueryPostprocessDataContext() {
             @Override
-            protected DataSet materializeMainSchemaTable(Table table, List<Column> columns, int maxRows) {
+            protected DataSet materializeMainSchemaTable(Table table, Column[] columns, int maxRows) {
                 throw new UnsupportedAddressTypeException();
             }
 

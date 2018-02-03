@@ -18,10 +18,9 @@
  */
 package org.apache.metamodel.util;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
+import static org.junit.Assert.*;
 
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.Arrays;
 import java.util.Collections;
@@ -39,7 +38,7 @@ public class FileResourceTest {
     public void testCannotWriteToDirectory() throws Exception {
         FileResource dir = new FileResource(".");
         assertTrue(dir.isReadOnly());
-
+        
         try {
             dir.write();
             fail("Exception expected");
@@ -77,14 +76,20 @@ public class FileResourceTest {
 
         final FileResource res1 = new FileResource(folder.getRoot());
 
-        final String str1 = res1.read(in -> {
-            return FileHelper.readInputStreamAsString(in, "UTF8");
+        final String str1 = res1.read(new Func<InputStream, String>() {
+            @Override
+            public String eval(InputStream in) {
+                return FileHelper.readInputStreamAsString(in, "UTF8");
+            }
         });
 
         Assert.assertEquals(contentString, str1);
 
-        final String str2 = res1.read(in -> {
+        final String str2 = res1.read(new Func<InputStream, String>() {
+            @Override
+            public String eval(InputStream in) {
                 return FileHelper.readInputStreamAsString(in, "UTF8");
+            }
         });
         Assert.assertEquals(str1, str2);
     }

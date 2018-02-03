@@ -36,12 +36,7 @@ public class SQLServerQueryRewriter extends OffsetFetchQueryRewriter {
     public static final int FIRST_FETCH_SUPPORTING_VERSION = 11;
 
     public SQLServerQueryRewriter(JdbcDataContext dataContext) {
-        super(dataContext, FIRST_FETCH_SUPPORTING_VERSION, true);
-    }
-
-    @Override
-    public boolean isMaxRowsSupported() {
-        return true;
+        super(dataContext, FIRST_FETCH_SUPPORTING_VERSION);
     }
 
     /**

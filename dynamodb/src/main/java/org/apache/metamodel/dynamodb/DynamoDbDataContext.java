@@ -24,12 +24,10 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 import org.apache.metamodel.MetaModelException;
 import org.apache.metamodel.QueryPostprocessDataContext;
 import org.apache.metamodel.UpdateScript;
-import org.apache.metamodel.UpdateSummary;
 import org.apache.metamodel.UpdateableDataContext;
 import org.apache.metamodel.data.DataSet;
 import org.apache.metamodel.data.DefaultRow;
@@ -258,8 +256,11 @@ public class DynamoDbDataContext extends QueryPostprocessDataContext implements 
     }
 
     @Override
-    protected DataSet materializeMainSchemaTable(Table table, List<Column> columns, int maxRows) {
-        final List<String> attributeNames = columns.stream().map(col-> col.getName()).collect(Collectors.toList());
+    protected DataSet materializeMainSchemaTable(Table table, Column[] columns, int maxRows) {
+        final List<String> attributeNames = new ArrayList<>(columns.length);
+        for (final Column column : columns) {
+            attributeNames.add(column.getName());
+        }
         final ScanRequest scanRequest = new ScanRequest(table.getName());
         scanRequest.setAttributesToGet(attributeNames);
         if (maxRows > 0) {
@@ -292,7 +293,7 @@ public class DynamoDbDataContext extends QueryPostprocessDataContext implements 
     }
 
     @Override
-    public UpdateSummary executeUpdate(UpdateScript update) {
+    public void executeUpdate(UpdateScript update) {
         final DynamoDbUpdateCallback callback = new DynamoDbUpdateCallback(this);
         try {
             update.run(callback);
@@ -301,6 +302,5 @@ public class DynamoDbDataContext extends QueryPostprocessDataContext implements 
                 Thread.currentThread().interrupt();
             }
         }
-        return callback.getUpdateSummary();
     }
 }

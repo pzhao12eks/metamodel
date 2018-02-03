@@ -19,12 +19,15 @@
 package org.apache.metamodel.salesforce;
 
 import java.text.SimpleDateFormat;
-import java.util.*;
+import java.util.Date;
+import java.util.List;
+import java.util.Locale;
+import java.util.TimeZone;
 
+import com.sforce.ws.ConnectorConfig;
 import org.apache.metamodel.MetaModelException;
 import org.apache.metamodel.QueryPostprocessDataContext;
 import org.apache.metamodel.UpdateScript;
-import org.apache.metamodel.UpdateSummary;
 import org.apache.metamodel.UpdateableDataContext;
 import org.apache.metamodel.data.DataSet;
 import org.apache.metamodel.data.FirstRowDataSet;
@@ -45,16 +48,16 @@ import com.sforce.soap.partner.Connector;
 import com.sforce.soap.partner.PartnerConnection;
 import com.sforce.soap.partner.QueryResult;
 import com.sforce.ws.ConnectionException;
-import com.sforce.ws.ConnectorConfig;
 
 /**
  * A datacontext that uses the Salesforce API.
  * 
- * Metadata about schema structure is explored using 'describe' SOAP web services.
+ * Metadata about schema structure is explored using 'describe' SOAP web
+ * services.
  * 
- * Queries are fired using the SOQL dialect of SQL, see
- * <a href= "http://www.salesforce.com/us/developer/docs/api/Content/sforce_api_calls_soql_select.htm" >SOQL
- * reference</a>.
+ * Queries are fired using the SOQL dialect of SQL, see <a href=
+ * "http://www.salesforce.com/us/developer/docs/api/Content/sforce_api_calls_soql_select.htm"
+ * >SOQL reference</a>.
  */
 public class SalesforceDataContext extends QueryPostprocessDataContext implements UpdateableDataContext {
 
@@ -72,13 +75,11 @@ public class SalesforceDataContext extends QueryPostprocessDataContext implement
 
     public SalesforceDataContext(String endpoint, String username, String password, String securityToken) {
         try {
-            final ConnectorConfig config = new ConnectorConfig();
+            ConnectorConfig config = new ConnectorConfig();
             config.setUsername(username);
-            config.setPassword(securityToken == null ? password : password + securityToken);
-            if (endpoint != null) {
-                config.setAuthEndpoint(endpoint);
-                config.setServiceEndpoint(endpoint);
-            }
+            config.setPassword(password + securityToken);
+            config.setAuthEndpoint(endpoint);
+            config.setServiceEndpoint(endpoint);
             _connection = Connector.newConnection(config);
         } catch (ConnectionException e) {
             throw SalesforceUtils.wrapException(e, "Failed to log in to Salesforce service");
@@ -87,25 +88,18 @@ public class SalesforceDataContext extends QueryPostprocessDataContext implement
 
     public SalesforceDataContext(String username, String password, String securityToken) {
         try {
-            _connection =
-                    Connector.newConnection(username, securityToken == null ? password : password + securityToken);
-        } catch (ConnectionException e) {
-            throw SalesforceUtils.wrapException(e, "Failed to log in to Salesforce service");
-        }
-    }
-
-    public SalesforceDataContext(String username, String password) {
-        try {
-            _connection = Connector.newConnection(username, password);
+            _connection = Connector.newConnection(username, password + securityToken);
         } catch (ConnectionException e) {
             throw SalesforceUtils.wrapException(e, "Failed to log in to Salesforce service");
         }
     }
 
     /**
-     * Creates a {@code SalesforceDataContext} instance , configured with given salesforce connection.
+     * Creates a {@code SalesforceDataContext} instance , configured with given
+     * salesforce connection.
      * 
-     * @param connection salesforce connection (cannot be {@code null}).
+     * @param connection
+     *            salesforce connection (cannot be {@code null}).
      * 
      */
     public SalesforceDataContext(PartnerConnection connection) {
@@ -163,14 +157,14 @@ public class SalesforceDataContext extends QueryPostprocessDataContext implement
         try {
             sb.append("SELECT ");
             int i = 0;
-            final List<Column> columns = new ArrayList<>(selectItems.size());
+            final Column[] columns = new Column[selectItems.size()];
             for (SelectItem selectItem : selectItems) {
                 validateSoqlSupportedSelectItem(selectItem);
-                columns.set(i,selectItem.getColumn());
+                columns[i] = selectItem.getColumn();
                 if (i != 0) {
                     sb.append(", ");
                 }
-                sb.append(columns.get(i).getName());
+                sb.append(columns[i].getName());
                 i++;
             }
 
@@ -352,7 +346,7 @@ public class SalesforceDataContext extends QueryPostprocessDataContext implement
     }
 
     private static void validateSoqlSupportedSelectItem(SelectItem selectItem) throws UnsupportedOperationException {
-        if (selectItem.hasFunction()) {
+        if (selectItem.getFunction() != null) {
             throw new UnsupportedOperationException("Function select items not supported: " + selectItem);
         }
         if (selectItem.getSubQuerySelectItem() != null) {
@@ -361,14 +355,14 @@ public class SalesforceDataContext extends QueryPostprocessDataContext implement
     }
 
     @Override
-    protected DataSet materializeMainSchemaTable(Table table, List<Column> columns, int maxRows) {
+    protected DataSet materializeMainSchemaTable(Table table, Column[] columns, int maxRows) {
         final StringBuilder sb = new StringBuilder();
         sb.append("SELECT ");
-        for (int i = 0; i < columns.size(); i++) {
+        for (int i = 0; i < columns.length; i++) {
             if (i != 0) {
                 sb.append(',');
             }
-            sb.append(columns.get(i).getName());
+            sb.append(columns[i].getName());
         }
         sb.append(" FROM ");
         sb.append(table.getName());
@@ -392,10 +386,9 @@ public class SalesforceDataContext extends QueryPostprocessDataContext implement
     }
 
     @Override
-    public UpdateSummary executeUpdate(UpdateScript update) {
+    public void executeUpdate(UpdateScript update) {
         final SalesforceUpdateCallback callback = new SalesforceUpdateCallback(this, _connection);
         update.run(callback);
         callback.close();
-        return callback.getUpdateSummary();
     }
 }

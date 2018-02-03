@@ -25,14 +25,12 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 import org.apache.metamodel.BatchUpdateScript;
 import org.apache.metamodel.DataContext;
 import org.apache.metamodel.MetaModelException;
 import org.apache.metamodel.QueryPostprocessDataContext;
 import org.apache.metamodel.UpdateScript;
-import org.apache.metamodel.UpdateSummary;
 import org.apache.metamodel.UpdateableDataContext;
 import org.apache.metamodel.data.DataSet;
 import org.apache.metamodel.data.DataSetHeader;
@@ -86,7 +84,8 @@ import io.searchbox.params.Parameters;
  * This implementation supports either automatic discovery of a schema or manual
  * specification of a schema, through the {@link SimpleTableDef} class.
  */
-public class ElasticSearchRestDataContext extends QueryPostprocessDataContext implements DataContext,
+public class ElasticSearchRestDataContext extends QueryPostprocessDataContext implements
+        DataContext,
         UpdateableDataContext {
 
     private static final Logger logger = LoggerFactory.getLogger(ElasticSearchRestDataContext.class);
@@ -235,7 +234,7 @@ public class ElasticSearchRestDataContext extends QueryPostprocessDataContext im
             dynamicTableDefinitions.clear();
             dynamicTableDefinitions.addAll(Arrays.asList(tables));
             for (final SimpleTableDef tableDef : dynamicTableDefinitions) {
-                final List<String> tableNames = theSchema.getTableNames();
+                final List<String> tableNames = Arrays.asList(theSchema.getTableNames());
 
                 if (!tableNames.contains(tableDef.getName())) {
                     addTable(theSchema, tableDef);
@@ -262,8 +261,8 @@ public class ElasticSearchRestDataContext extends QueryPostprocessDataContext im
     }
 
     @Override
-    protected DataSet materializeMainSchemaTable(Table table, List<SelectItem> selectItems,
-            List<FilterItem> whereItems, int firstRow, int maxRows) {
+    protected DataSet materializeMainSchemaTable(Table table, List<SelectItem> selectItems, List<FilterItem> whereItems,
+            int firstRow, int maxRows) {
         final QueryBuilder queryBuilder = ElasticSearchUtils.createQueryBuilderForSimpleWhere(whereItems,
                 LogicalOperator.AND);
         if (queryBuilder != null) {
@@ -300,11 +299,11 @@ public class ElasticSearchRestDataContext extends QueryPostprocessDataContext im
     }
 
     @Override
-    protected DataSet materializeMainSchemaTable(Table table, List<Column> columns, int maxRows) {
+    protected DataSet materializeMainSchemaTable(Table table, Column[] columns, int maxRows) {
         SearchResult searchResult = executeSearch(table, createSearchRequest(1, maxRows, null), scrollNeeded(
                 maxRows));
 
-        return new JestElasticSearchDataSet(elasticSearchClient, searchResult, columns.stream().map(SelectItem::new).collect(Collectors.toList()));
+        return new JestElasticSearchDataSet(elasticSearchClient, searchResult, columns);
     }
 
     private SearchSourceBuilder createSearchRequest(int firstRow, int maxRows, QueryBuilder queryBuilder) {
@@ -372,12 +371,11 @@ public class ElasticSearchRestDataContext extends QueryPostprocessDataContext im
     }
 
     @Override
-    public UpdateSummary executeUpdate(UpdateScript update) {
+    public void executeUpdate(UpdateScript update) {
         final boolean isBatch = update instanceof BatchUpdateScript;
         final JestElasticSearchUpdateCallback callback = new JestElasticSearchUpdateCallback(this, isBatch);
         update.run(callback);
         callback.onExecuteUpdateFinished();
-        return callback.getUpdateSummary();
     }
 
     /**

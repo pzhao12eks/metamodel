@@ -18,29 +18,44 @@
  */
 package org.apache.metamodel.util;
 
+import java.text.DateFormat;
+import java.util.Date;
+
 /**
- * Represents a mutable reference to any object
+ * A Date implementation that is immutable and has a predictable
+ * (locale-indifferent) toString() method.
  * 
- * @param <E>
+ * @deprecated MetaModel is not a Date API, use Joda time or live with
+ *             java.util.Date.
  */
-public final class MutableRef<E> implements Ref<E> {
+@Deprecated
+public final class ImmutableDate extends Date {
 
-	private E _object;
+	private static final long serialVersionUID = 1L;
 
-	public MutableRef() {
+	public ImmutableDate(long time) {
+		super(time);
 	}
 
-	public MutableRef(E object) {
-		_object = object;
+	public ImmutableDate(Date date) {
+		super(date.getTime());
+	}
+
+	/**
+	 * This mutator will throw an {@link UnsupportedOperationException}, since
+	 * the date is ummutable.
+	 * 
+	 * @param time
+	 *            new time to set
+	 */
+	@Override
+	public void setTime(long time) {
+		throw new UnsupportedOperationException("setTime(...) is not allowed");
 	}
 
 	@Override
-	public E get() {
-		return _object;
+	public String toString() {
+		DateFormat format = DateUtils.createDateFormat();
+		return format.format(this);
 	}
-
-	public void set(E object) {
-		_object = object;
-	}
-
 }

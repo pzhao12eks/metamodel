@@ -32,7 +32,6 @@ public class HBaseConfiguration extends BaseObject implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
-    public static final ColumnType DEFAULT_ROW_KEY_TYPE = ColumnType.BINARY;
     public static final String DEFAULT_SCHEMA_NAME = "HBase";
     public static final String DEFAULT_ZOOKEEPER_HOSTNAME = "127.0.0.1";
     public static final int DEFAULT_ZOOKEEPER_PORT = 2181;
@@ -57,7 +56,7 @@ public class HBaseConfiguration extends BaseObject implements Serializable {
     }
 
     public HBaseConfiguration(String zookeeperHostname, int zookeeperPort) {
-        this(DEFAULT_SCHEMA_NAME, zookeeperHostname, zookeeperPort, null, DEFAULT_ROW_KEY_TYPE);
+        this(DEFAULT_SCHEMA_NAME, zookeeperHostname, zookeeperPort, null, ColumnType.BINARY);
     }
 
     public HBaseConfiguration(String zookeeperHostname, int zookeeperPort, ColumnType defaultRowKeyType) {

@@ -25,6 +25,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -38,7 +39,6 @@ import org.apache.metamodel.BatchUpdateScript;
 import org.apache.metamodel.MetaModelException;
 import org.apache.metamodel.MetaModelHelper;
 import org.apache.metamodel.UpdateScript;
-import org.apache.metamodel.UpdateSummary;
 import org.apache.metamodel.UpdateableDataContext;
 import org.apache.metamodel.data.DataSet;
 import org.apache.metamodel.data.EmptyDataSet;
@@ -343,7 +343,6 @@ public class JdbcDataContext extends AbstractDataContext implements UpdateableDa
         return dataSet;
     }
 
-    @SuppressWarnings("resource")
     private DataSet execute(Connection connection, Query query, Statement statement, JdbcCompiledQuery compiledQuery,
             JdbcCompiledQueryLease lease, Object[] values) throws SQLException, MetaModelException {
         Integer maxRows = query.getMaxRows();
@@ -392,7 +391,7 @@ public class JdbcDataContext extends AbstractDataContext implements UpdateableDa
         final Integer firstRow = query.getFirstRow();
         boolean postProcessFirstRow = false;
         if (firstRow != null) {
-            if (_queryRewriter.isFirstRowSupported(query)) {
+            if (_queryRewriter.isFirstRowSupported()) {
                 logger.debug("First row property will be treated by query rewriter");
             } else {
                 postProcessFirstRow = true;
@@ -642,12 +641,12 @@ public class JdbcDataContext extends AbstractDataContext implements UpdateableDa
         // databases).
         boolean found = false;
         String result = null;
-        List<String> schemaNames = getSchemaNames();
+        String[] schemaNames = getSchemaNames();
 
         // First strategy: If there's only one schema available, that must
         // be it
-        if (schemaNames.size() == 1) {
-            result = schemaNames.get(0);
+        if (schemaNames.length == 1) {
+            result = schemaNames[0];
             found = true;
         }
 
@@ -668,7 +667,7 @@ public class JdbcDataContext extends AbstractDataContext implements UpdateableDa
                         }
                     }
                     if (url != null && url.length() > 0) {
-                        if (schemaNames.size() > 0) {
+                        if (schemaNames.length > 0) {
                             StringTokenizer st = new StringTokenizer(url, "/\\:");
                             int tokenCount = st.countTokens();
                             if (tokenCount > 0) {
@@ -677,8 +676,8 @@ public class JdbcDataContext extends AbstractDataContext implements UpdateableDa
                                 }
                                 String lastToken = st.nextToken();
 
-                                for (int i = 0; i < schemaNames.size() && !found; i++) {
-                                    String schemaName = schemaNames.get(i);
+                                for (int i = 0; i < schemaNames.length && !found; i++) {
+                                    String schemaName = schemaNames[i];
                                     if (lastToken.indexOf(schemaName) != -1) {
                                         result = schemaName;
                                         found = true;
@@ -700,9 +699,9 @@ public class JdbcDataContext extends AbstractDataContext implements UpdateableDa
                         }
                     }
                     if (username != null) {
-                        for (int i = 0; i < schemaNames.size() && !found; i++) {
-                            if (username.equalsIgnoreCase(schemaNames.get(i))) {
-                                result = schemaNames.get(i);
+                        for (int i = 0; i < schemaNames.length && !found; i++) {
+                            if (username.equalsIgnoreCase(schemaNames[i])) {
+                                result = schemaNames[i];
                                 found = true;
                             }
                         }
@@ -740,7 +739,7 @@ public class JdbcDataContext extends AbstractDataContext implements UpdateableDa
         return result;
     }
 
-    private String findDefaultSchema(final String defaultName, final List<String> schemaNames) {
+    private String findDefaultSchema(final String defaultName, final String[] schemaNames) {
         for (String schemaName : schemaNames) {
             if (defaultName.equals(schemaName)) {
                 return schemaName;
@@ -784,14 +783,14 @@ public class JdbcDataContext extends AbstractDataContext implements UpdateableDa
     }
 
     @Override
-    protected List<String> getSchemaNamesInternal() {
+    protected String[] getSchemaNamesInternal() {
         Connection connection = getConnection();
         try {
             DatabaseMetaData metaData = connection.getMetaData();
-            List<String> result = new ArrayList<>();
+            Collection<String> result = new ArrayList<>();
 
             if (DATABASE_PRODUCT_SQLSERVER.equals(_databaseProductName)) {
-                result = new ArrayList<>(getSchemaSQLServerNames(metaData));
+                result = getSchemaSQLServerNames(metaData);
             } else if (_usesCatalogsAsSchemas) {
                 String[] catalogNames = getCatalogNames();
                 for (String name : catalogNames) {
@@ -817,7 +816,7 @@ public class JdbcDataContext extends AbstractDataContext implements UpdateableDa
                 logger.info("No schemas or catalogs found. Creating unnamed schema.");
                 result.add(null);
             }
-            return result;
+            return result.toArray(new String[result.size()]);
         } catch (SQLException e) {
             throw JdbcUtils.wrapException(e, "get schema names");
         } finally {
@@ -842,7 +841,7 @@ public class JdbcDataContext extends AbstractDataContext implements UpdateableDa
     }
 
     @Override
-    public UpdateSummary executeUpdate(final UpdateScript update) {
+    public void executeUpdate(final UpdateScript update) {
         final JdbcUpdateCallback updateCallback;
 
         if (_supportsBatchUpdates && update instanceof BatchUpdateScript) {
@@ -867,8 +866,6 @@ public class JdbcDataContext extends AbstractDataContext implements UpdateableDa
             updateCallback.close(false);
             throw e;
         }
-        
-        return updateCallback.getUpdateSummary();
     }
 
     protected boolean isSingleConnection() {

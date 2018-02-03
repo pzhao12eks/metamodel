@@ -19,12 +19,11 @@
 package org.apache.metamodel.couchdb;
 
 import java.util.List;
-import java.util.stream.Collectors;
 
 import org.apache.metamodel.MetaModelException;
+import org.apache.metamodel.MetaModelHelper;
 import org.apache.metamodel.QueryPostprocessDataContext;
 import org.apache.metamodel.UpdateScript;
-import org.apache.metamodel.UpdateSummary;
 import org.apache.metamodel.UpdateableDataContext;
 import org.apache.metamodel.data.DataSet;
 import org.apache.metamodel.data.DocumentSource;
@@ -111,7 +110,7 @@ public class CouchDbDataContext extends QueryPostprocessDataContext implements U
     }
 
     @Override
-    protected DataSet materializeMainSchemaTable(Table table, List<Column> columns, int firstRow, int maxRows) {
+    protected DataSet materializeMainSchemaTable(Table table, Column[] columns, int firstRow, int maxRows) {
         // the connector represents a handle to the the couchdb "database".
         final String databaseName = table.getName();
         final CouchDbConnector connector = _couchDbInstance.createConnector(databaseName, false);
@@ -128,12 +127,12 @@ public class CouchDbDataContext extends QueryPostprocessDataContext implements U
 
         final StreamingViewResult streamingView = connector.queryForStreamingView(query);
 
-        final List<SelectItem> selectItems = columns.stream().map(SelectItem::new).collect(Collectors.toList());
+        final SelectItem[] selectItems = MetaModelHelper.createSelectItems(columns);
         return new CouchDbDataSet(selectItems, streamingView);
     }
 
     @Override
-    protected DataSet materializeMainSchemaTable(Table table, List<Column> columns, int maxRows) {
+    protected DataSet materializeMainSchemaTable(Table table, Column[] columns, int maxRows) {
         return materializeMainSchemaTable(table, columns, 1, maxRows);
     }
 
@@ -168,14 +167,13 @@ public class CouchDbDataContext extends QueryPostprocessDataContext implements U
     }
 
     @Override
-    public UpdateSummary executeUpdate(UpdateScript script) {
-        final CouchDbUpdateCallback callback = new CouchDbUpdateCallback(this);
+    public void executeUpdate(UpdateScript script) {
+        CouchDbUpdateCallback callback = new CouchDbUpdateCallback(this);
         try {
             script.run(callback);
         } finally {
             callback.close();
         }
-        return callback.getUpdateSummary();
     }
 
     @Override

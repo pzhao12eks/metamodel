@@ -92,10 +92,6 @@ public final class Query extends BaseObject implements Cloneable, Serializable {
         return select(selectItem);
     }
 
-    public Query select(List<Column> columns){
-        return select(columns.toArray(new Column[columns.size()]));
-    }
-
     public Query select(Column... columns) {
         for (Column column : columns) {
             SelectItem selectItem = new SelectItem(column);
@@ -168,7 +164,7 @@ public final class Query extends BaseObject implements Cloneable, Serializable {
 
     public Query selectAll(final FromItem fromItem) {
         if (fromItem.getTable() != null) {
-            final List<Column> columns = fromItem.getTable().getColumns();
+            final Column[] columns = fromItem.getTable().getColumns();
             for (final Column column : columns) {
                 select(column, fromItem);
             }
@@ -246,14 +242,6 @@ public final class Query extends BaseObject implements Cloneable, Serializable {
         return this;
     }
 
-    public Query groupBy(List<Column> columns) {
-        for (Column column : columns) {
-            SelectItem selectItem = new SelectItem(column).setQuery(this);
-            _groupByClause.addItem(new GroupByItem(selectItem));
-        }
-        return this;
-    }
-
     public Query orderBy(OrderByItem... items) {
         _orderByClause.addItems(items);
         return this;
@@ -281,6 +269,18 @@ public final class Query extends BaseObject implements Cloneable, Serializable {
 
     public Query orderBy(Column column) {
         return orderBy(column, Direction.ASC);
+    }
+
+    /**
+     * @deprecated use orderBy(Column, Direction) instead
+     */
+    @Deprecated
+    public Query orderBy(Column column, boolean ascending) {
+        if (ascending) {
+            return orderBy(column, Direction.ASC);
+        } else {
+            return orderBy(column, Direction.DESC);
+        }
     }
 
     public Query orderBy(Column column, Direction direction) {
@@ -580,10 +580,6 @@ public final class Query extends BaseObject implements Cloneable, Serializable {
      */
     public Integer getFirstRow() {
         return _firstRow;
-    }
-    
-    public InvokableQuery invokable(DataContext dataContext) {
-        return new DefaultInvokableQuery(this, dataContext);
     }
 
     @Override

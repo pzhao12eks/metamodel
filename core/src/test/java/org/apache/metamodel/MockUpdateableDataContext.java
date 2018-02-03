@@ -21,7 +21,6 @@ package org.apache.metamodel;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
-import java.util.stream.Collectors;
 
 import org.apache.metamodel.create.TableCreationBuilder;
 import org.apache.metamodel.data.CachingDataSetHeader;
@@ -69,16 +68,16 @@ public class MockUpdateableDataContext extends QueryPostprocessDataContext imple
     }
 
     @Override
-    protected DataSet materializeMainSchemaTable(Table table, List<Column> columns, int maxRows) {
+    protected DataSet materializeMainSchemaTable(Table table, Column[] columns, int maxRows) {
 
         List<Row> rows = new ArrayList<Row>();
-        List<SelectItem> items = columns.stream().map(SelectItem::new).collect(Collectors.toList());
+        SelectItem[] items = MetaModelHelper.createSelectItems(columns);
         CachingDataSetHeader header = new CachingDataSetHeader(items);
 
         for (final Object[] values : _values) {
-            Object[] rowValues = new Object[columns.size()];
-            for (int i = 0; i < columns.size(); i++) {
-                int columnNumber = columns.get(i).getColumnNumber();
+            Object[] rowValues = new Object[columns.length];
+            for (int i = 0; i < columns.length; i++) {
+                int columnNumber = columns[i].getColumnNumber();
                 rowValues[i] = values[columnNumber];
             }
             rows.add(new DefaultRow(header, rowValues));
@@ -101,8 +100,8 @@ public class MockUpdateableDataContext extends QueryPostprocessDataContext imple
     }
 
     @Override
-    public UpdateSummary executeUpdate(UpdateScript update) {
-        final AbstractUpdateCallback callback = new AbstractUpdateCallback(this) {
+    public void executeUpdate(UpdateScript update) {
+        update.run(new AbstractUpdateCallback(this) {
 
             @Override
             public boolean isDeleteSupported() {
@@ -154,15 +153,11 @@ public class MockUpdateableDataContext extends QueryPostprocessDataContext imple
                     IllegalStateException {
                 throw new UnsupportedOperationException();
             }
-        };
-        
-        update.run(callback);
-        
-        return callback.getUpdateSummary();
+        });
     }
 
     private void delete(List<FilterItem> whereItems) {
-        final List<SelectItem> selectItems = _table.getColumns().stream().map(SelectItem::new).collect(Collectors.toList());
+        final SelectItem[] selectItems = MetaModelHelper.createSelectItems(_table.getColumns());
         final CachingDataSetHeader header = new CachingDataSetHeader(selectItems);
         for (Iterator<Object[]> it = _values.iterator(); it.hasNext();) {
             Object[] values = (Object[]) it.next();

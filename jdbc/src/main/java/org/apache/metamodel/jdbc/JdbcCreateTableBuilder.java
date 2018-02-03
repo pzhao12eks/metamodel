@@ -21,7 +21,6 @@ package org.apache.metamodel.jdbc;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.util.List;
 
 import org.apache.metamodel.create.AbstractTableCreationBuilder;
 import org.apache.metamodel.jdbc.dialects.IQueryRewriter;
@@ -85,9 +84,9 @@ final class JdbcCreateTableBuilder extends AbstractTableCreationBuilder<JdbcUpda
         }
         sb.append(getUpdateCallback().quoteIfNescesary(table.getName()));
         sb.append(" (");
-        final List<Column> columns = table.getColumns();
-        for (int i = 0; i < columns.size(); i++) {
-            final Column column = columns.get(i);
+        final Column[] columns = table.getColumns();
+        for (int i = 0; i < columns.length; i++) {
+            final Column column = columns[i];
             if (i != 0) {
                 sb.append(", ");
             }
@@ -115,15 +114,15 @@ final class JdbcCreateTableBuilder extends AbstractTableCreationBuilder<JdbcUpda
             }
         }
         boolean primaryKeyExists = false;
-        for (int i = 0; i < columns.size(); i++) {
-            if (columns.get(i).isPrimaryKey()) {
+        for (int i = 0; i < columns.length; i++) {
+            if (columns[i].isPrimaryKey()) {
                 if (!primaryKeyExists) {
                     sb.append(", PRIMARY KEY(");
-                    sb.append(columns.get(i).getName());
+                    sb.append(columns[i].getName());
                     primaryKeyExists = true;
                 } else {
                     sb.append(",");
-                    sb.append(columns.get(i).getName());
+                    sb.append(columns[i].getName());
                 }
             }
         }

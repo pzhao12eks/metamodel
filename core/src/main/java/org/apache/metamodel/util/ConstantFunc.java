@@ -18,15 +18,13 @@
  */
 package org.apache.metamodel.util;
 
-import java.util.function.Function;
-
 /**
  * A function that always returns the same constant response.
  * 
  * @param <I>
  * @param <O>
  */
-public final class ConstantFunc<I, O> implements Function<I, O> {
+public final class ConstantFunc<I, O> implements Func<I, O> {
 
     private final O _response;
 
@@ -35,7 +33,7 @@ public final class ConstantFunc<I, O> implements Function<I, O> {
     }
 
     @Override
-    public O apply(I arg) {
+    public O eval(I arg) {
         return _response;
     }
 

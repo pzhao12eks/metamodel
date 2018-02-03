@@ -20,18 +20,15 @@ package org.apache.metamodel.csv;
 
 import java.io.BufferedReader;
 import java.io.IOException;
-import java.util.List;
-import java.util.stream.Collectors;
 
 import org.apache.metamodel.MetaModelException;
 import org.apache.metamodel.data.AbstractDataSet;
 import org.apache.metamodel.data.DataSetHeader;
 import org.apache.metamodel.data.Row;
-import org.apache.metamodel.query.SelectItem;
 import org.apache.metamodel.schema.Column;
 import org.apache.metamodel.util.FileHelper;
 
-import com.opencsv.ICSVParser;
+import au.com.bytecode.opencsv.CSVParser;
 
 /**
  * A specialized DataSet implementation for the CSV module under circumstances
@@ -41,7 +38,7 @@ import com.opencsv.ICSVParser;
 final class SingleLineCsvDataSet extends AbstractDataSet {
 
     private final BufferedReader _reader;
-    private final ICSVParser _csvParser;
+    private final CSVParser _csvParser;
     private final int _columnsInTable;
     private final boolean _failOnInconsistentRowLength;
 
@@ -49,9 +46,9 @@ final class SingleLineCsvDataSet extends AbstractDataSet {
     private volatile Integer _rowsRemaining;
     private volatile Row _row;
 
-    public SingleLineCsvDataSet(BufferedReader reader, ICSVParser csvParser, List<Column> columns, Integer maxRows,
-                                int columnsInTable, boolean failOnInconsistentRowLength) {
-        super(columns.stream().map(SelectItem::new).collect(Collectors.toList()));
+    public SingleLineCsvDataSet(BufferedReader reader, CSVParser csvParser, Column[] columns, Integer maxRows,
+            int columnsInTable, boolean failOnInconsistentRowLength) {
+        super(columns);
         _reader = reader;
         _csvParser = csvParser;
         _columnsInTable = columnsInTable;
@@ -94,7 +91,7 @@ final class SingleLineCsvDataSet extends AbstractDataSet {
         return _columnsInTable;
     }
 
-    protected ICSVParser getCsvParser() {
+    protected CSVParser getCsvParser() {
         return _csvParser;
     }
 

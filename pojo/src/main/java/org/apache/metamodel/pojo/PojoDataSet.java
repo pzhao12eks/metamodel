@@ -19,7 +19,6 @@
 package org.apache.metamodel.pojo;
 
 import java.util.Iterator;
-import java.util.List;
 
 import org.apache.metamodel.data.AbstractDataSet;
 import org.apache.metamodel.data.DataSet;
@@ -39,7 +38,7 @@ final class PojoDataSet<E> extends AbstractDataSet {
     private final Iterator<E> _iterator;
     private E _next;
 
-    public PojoDataSet(TableDataProvider<E> pojoTable, List<SelectItem> selectItems) {
+    public PojoDataSet(TableDataProvider<E> pojoTable, SelectItem[] selectItems) {
         super(selectItems);
         _pojoTable = pojoTable;
 

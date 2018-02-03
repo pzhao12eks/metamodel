@@ -18,30 +18,28 @@
  */
 package org.apache.metamodel;
 
-import java.util.List;
-import java.util.function.Function;
-
 import org.apache.metamodel.data.DataSet;
 import org.apache.metamodel.query.Query;
 import org.apache.metamodel.schema.Column;
 import org.apache.metamodel.schema.Table;
+import org.apache.metamodel.util.Func;
 
 final class CompositeQueryDelegate extends QueryPostprocessDelegate {
 
-	private final Function<Table, DataContext> _dataContextRetrievalFunction;
+	private final Func<Table, DataContext> _dataContextRetrievalFunction;
 
 	public CompositeQueryDelegate(
-			Function<Table, DataContext> dataContextRetrievalFunction) {
+			Func<Table, DataContext> dataContextRetrievalFunction) {
 		_dataContextRetrievalFunction = dataContextRetrievalFunction;
 	}
 
 	@Override
-	protected DataSet materializeMainSchemaTable(Table table, List<Column> columns,
+	protected DataSet materializeMainSchemaTable(Table table, Column[] columns,
 			int maxRows) {
 		// find the appropriate datacontext to execute a simple
 		// table materialization query
-		final DataContext dc = _dataContextRetrievalFunction.apply(table);
-		final Query q = new Query().select(columns).from(table);
+		DataContext dc = _dataContextRetrievalFunction.eval(table);
+		Query q = new Query().select(columns).from(table);
 		if (maxRows >= 0) {
 			q.setMaxRows(maxRows);
 		}

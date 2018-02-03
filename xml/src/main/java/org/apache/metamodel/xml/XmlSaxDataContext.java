@@ -20,13 +20,9 @@ package org.apache.metamodel.xml;
 
 import java.io.File;
 import java.io.InputStream;
-import java.util.Arrays;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
-import java.util.function.Supplier;
 
 import javax.xml.parsers.SAXParser;
 import javax.xml.parsers.SAXParserFactory;
@@ -47,6 +43,7 @@ import org.apache.metamodel.schema.Schema;
 import org.apache.metamodel.schema.Table;
 import org.apache.metamodel.util.Action;
 import org.apache.metamodel.util.FileResource;
+import org.apache.metamodel.util.Ref;
 import org.apache.metamodel.util.Resource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -70,11 +67,11 @@ public class XmlSaxDataContext extends QueryPostprocessDataContext {
 
     public static final String COLUMN_NAME_ROW_ID = "row_id";
 
-    private final Supplier<InputSource> _inputSourceRef;
+    private final Ref<InputSource> _inputSourceRef;
     private final Map<XmlSaxTableDef, Map<String, String>> _valueXpaths;
     private String _schemaName;
-    private Collection<XmlSaxTableDef> _tableDefs;
-    
+    private XmlSaxTableDef[] _tableDefs;
+
     /**
      * Constructs an XML DataContext based on SAX parsing.
      * 
@@ -82,12 +79,12 @@ public class XmlSaxDataContext extends QueryPostprocessDataContext {
      *            a factory reference for the input source to read the XML from.
      *            The ref will be repeatedly called for each access to the file!
      * @param tableDefs
-     *            a collection of table definitions, which provide instructions as
+     *            an array of table definitions, which provide instructions as
      *            to the xpaths to apply to the document.
      * 
      * @see XmlSaxTableDef
      */
-    public XmlSaxDataContext(Supplier<InputSource> inputSourceRef, Collection<XmlSaxTableDef> tableDefs) {
+    public XmlSaxDataContext(Ref<InputSource> inputSourceRef, XmlSaxTableDef... tableDefs) {
         _inputSourceRef = inputSourceRef;
         _tableDefs = tableDefs;
         _valueXpaths = new HashMap<XmlSaxTableDef, Map<String, String>>();
@@ -102,16 +99,8 @@ public class XmlSaxDataContext extends QueryPostprocessDataContext {
             }
         }
     }
-    
-    public XmlSaxDataContext(Supplier<InputSource> inputSourceRef, XmlSaxTableDef... tableDefs) {
-        this(inputSourceRef, Arrays.asList(tableDefs));
-    }
 
     public XmlSaxDataContext(final Resource resource, XmlSaxTableDef... tableDefs) {
-        this(resource, Arrays.asList(tableDefs));
-    }
-    
-    public XmlSaxDataContext(final Resource resource, Collection<XmlSaxTableDef> tableDefs) {
         this(createInputSourceRef(resource), tableDefs);
     }
 
@@ -119,10 +108,13 @@ public class XmlSaxDataContext extends QueryPostprocessDataContext {
         this(createInputSourceRef(new FileResource(file)), tableDefs);
     }
 
-    private static Supplier<InputSource> createInputSourceRef(final Resource resource) {
-        return () -> {
-            final InputStream in = resource.read();
-            return new InputSource(in);
+    private static Ref<InputSource> createInputSourceRef(final Resource resource) {
+        return new Ref<InputSource>() {
+            @Override
+            public InputSource get() {
+                final InputStream in = resource.read();
+                return new InputSource(in);
+            }
         };
     }
 
@@ -132,8 +124,8 @@ public class XmlSaxDataContext extends QueryPostprocessDataContext {
 
         for (XmlSaxTableDef tableDef : _tableDefs) {
             final String rowXpath = tableDef.getRowXpath();
-            final MutableTable table = new MutableTable(getTableName(tableDef)).setSchema(schema).setRemarks("XPath: "
-                    + rowXpath);
+            final MutableTable table = new MutableTable(getTableName(tableDef)).setSchema(schema).setRemarks(
+                    "XPath: " + rowXpath);
 
             final MutableColumn rowIndexColumn = new MutableColumn(COLUMN_NAME_ROW_ID, ColumnType.INTEGER)
                     .setColumnNumber(0).setNullable(false).setTable(table).setRemarks("Row/tag index (0-based)");
@@ -216,13 +208,13 @@ public class XmlSaxDataContext extends QueryPostprocessDataContext {
     }
 
     @Override
-    protected DataSet materializeMainSchemaTable(Table table, List<Column> columns, int maxRows) {
+    protected DataSet materializeMainSchemaTable(Table table, Column[] columns, int maxRows) {
         final XmlSaxTableDef tableDef = getTableDef(table);
 
-        final String[] valueXpaths = new String[columns.size()];
-        final SelectItem[] selectItems = new SelectItem[columns.size()];
-        for (int i = 0; i < columns.size(); i++) {
-            final Column column = columns.get(i);
+        final String[] valueXpaths = new String[columns.length];
+        final SelectItem[] selectItems = new SelectItem[columns.length];
+        for (int i = 0; i < columns.length; i++) {
+            final Column column = columns[i];
             selectItems[i] = new SelectItem(column);
             valueXpaths[i] = getXpath(tableDef, column);
         }
@@ -233,8 +225,8 @@ public class XmlSaxDataContext extends QueryPostprocessDataContext {
                 SAXParserFactory saxFactory = SAXParserFactory.newInstance();
                 SAXParser saxParser = saxFactory.newSAXParser();
                 XMLReader xmlReader = saxParser.getXMLReader();
-                xmlReader.setContentHandler(new XmlSaxContentHandler(tableDef.getRowXpath(), rowPublisher,
-                        valueXpaths));
+                xmlReader
+                        .setContentHandler(new XmlSaxContentHandler(tableDef.getRowXpath(), rowPublisher, valueXpaths));
                 try {
                     xmlReader.parse(_inputSourceRef.get());
                 } catch (XmlStopParsingException e) {
